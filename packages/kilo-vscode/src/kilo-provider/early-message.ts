@@ -1,4 +1,5 @@
 import { routeSuggestionWebviewMessage } from "./handlers/suggestion"
+import { routeKeypoolLiveMessage } from "./handlers/keypoollive"
 import * as ModelState from "./model-state"
 import { routeInputToolMessage } from "../services/input-tools"
 import type { KiloConnectionService } from "../services/cli-backend/connection-service"
@@ -41,6 +42,7 @@ export async function routeEarlyMessage(
     )
     return true
   }
+  if (await routeKeypoolLiveMessage(message, ctx)) return true
   await routeSuggestionWebviewMessage(ctx.question, message)
   if (await ModelState.handleMessage(message.type, message, ctx.client, ctx.post)) return true
   if (message.type === "exportSessionTranscript") {

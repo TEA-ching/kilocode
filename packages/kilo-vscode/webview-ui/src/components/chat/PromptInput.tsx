@@ -3,8 +3,9 @@
  * Text input with send/abort buttons, ghost-text autocomplete, and @ file mention support
  */
 
-import { createSignal, createEffect, on, For, Index, onCleanup, Show, untrack, type Component } from "solid-js"
+import { createSignal, createEffect, createMemo, on, For, Index, onCleanup, Show, untrack, type Component } from "solid-js"
 import { Button } from "@kilocode/kilo-ui/button"
+import { useDialog } from "@kilocode/kilo-ui/context/dialog"
 import { IconButton } from "@kilocode/kilo-ui/icon-button"
 import { Tooltip } from "@kilocode/kilo-ui/tooltip"
 import { FileIcon } from "@kilocode/kilo-ui/file-icon"
@@ -22,6 +23,7 @@ import { useProvider } from "../../context/provider"
 import { ModelSelector } from "../shared/ModelSelector"
 import { ModeSwitcher } from "../shared/ModeSwitcher"
 import { SandboxButtonBase, SandboxTooltipContent } from "../shared/SandboxButton"
+import KeypoolLiveDashboard from "./KeypoolLiveDashboard"
 import { SpeechToTextButton } from "../speech-to-text/SpeechToTextButton"
 import { canUseSpeechToText, selectedSpeechToTextModel } from "../speech-to-text/availability"
 import { ThinkingSelector } from "../shared/ThinkingSelector"
@@ -162,6 +164,7 @@ function MentionItemContent(props: { item: MentionResult }) {
 
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const session = useSession()
+  const dialog = useDialog()
   const tabs = useLocalTabs()
   const server = useServer()
   const indexing = useIndexing()
@@ -235,6 +238,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [sandboxes, setSandboxes] = createSignal<Record<string, SandboxState>>({})
   const [sandboxDefault, setSandboxDefault] = createSignal<SandboxDefaultState>()
   const [sandboxRequests, setSandboxRequests] = createSignal<Record<string, string>>({})
+  const [rotatingKeypoolLiveKey, setRotatingKeypoolLiveKey] = createSignal<string>()
+  const selectedModel = createMemo(() => session.selected(sid()))
+  const keypoolLiveVaultProviderName = () => {
+    const modelID = selectedModel()?.modelID
+    return modelID?.includes("/") ? modelID.slice(0, modelID.indexOf("/")) : undefined
+  }
+  const rotateKeypoolLiveKey = () => {
+    if (selectedModel()?.providerID !== "keypoollive" || rotatingKeypoolLiveKey()) return
+    const vaultProviderName = keypoolLiveVaultProviderName()
+    if (!vaultProviderName) return
+    const requestID = crypto.randomUUID()
+    setRotatingKeypoolLiveKey(requestID)
+    vscode.postMessage({ type: "rotateKeypoolLiveKey", vaultProviderName, requestID })
+  }
   let sandboxRetry: ReturnType<typeof setTimeout> | undefined
   let sandboxAttempts = 0
   const sandboxID = () => {
@@ -678,6 +695,27 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const unsubscribe = vscode.onMessage((message) => {
     if (handleSandboxMessage(message)) return
+
+    if (message.type === "keypoolLiveRotated") {
+      if (message.requestID !== rotatingKeypoolLiveKey()) return
+      setRotatingKeypoolLiveKey(undefined)
+      showToast({
+        variant: "success",
+        title: language.t("prompt.action.rotateKeypoolLiveKey.success"),
+      })
+      return
+    }
+
+    if (message.type === "keypoolLiveRotateError") {
+      if (message.requestID !== rotatingKeypoolLiveKey()) return
+      setRotatingKeypoolLiveKey(undefined)
+      showToast({
+        variant: "error",
+        title: language.t("prompt.action.rotateKeypoolLiveKey.error"),
+        description: message.error,
+      })
+      return
+    }
 
     if (message.type === "setChatBoxMessage") {
       setText(message.text)
@@ -1432,6 +1470,53 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           <ModeSwitcher sessionID={sid} />
           <ModelSelector sessionID={sid} />
           <ThinkingSelector sessionID={sid} />
+          <Show when={selectedModel()?.providerID === "keypoollive"}>
+            <Tooltip
+              value={
+                rotatingKeypoolLiveKey()
+                  ? language.t("prompt.action.rotateKeypoolLiveKey.rotating")
+                  : language.t("prompt.action.rotateKeypoolLiveKey")
+              }
+              placement="top"
+              openDelay={0}
+            >
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={rotateKeypoolLiveKey}
+                disabled={!!rotatingKeypoolLiveKey()}
+                aria-label={language.t("prompt.action.rotateKeypoolLiveKey")}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path
+                    d="M13.5 8a5.5 5.5 0 11-1.65-3.93M13.5 2.5v3.5h-3.5"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </Button>
+            </Tooltip>
+            <Tooltip value={language.t("prompt.action.keypoolLiveDashboard")} placement="top" openDelay={0}>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={() => dialog.show(() => <KeypoolLiveDashboard />)}
+                aria-label={language.t("prompt.action.keypoolLiveDashboard")}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path
+                    d="M2 13V9M6 13V6M10 13V3M14 13V10"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </Button>
+            </Tooltip>
+          </Show>
           <Show when={session.hasModelOverride(sid())}>
             <Tooltip value={language.t("prompt.action.resetModel")} placement="top" openDelay={0}>
               <Button

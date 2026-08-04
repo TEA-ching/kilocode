@@ -224,6 +224,11 @@ export const dict = {
   "prompt.action.sandbox.description.disabledNetworkAllowed":
     "Click to restrict filesystem writes. Network access remains allowed by your sandbox settings.",
   "prompt.action.resetModel": "Reset model to default",
+  "prompt.action.rotateKeypoolLiveKey": "Rotate KeypoolLive key",
+  "prompt.action.rotateKeypoolLiveKey.rotating": "Rotating key...",
+  "prompt.action.rotateKeypoolLiveKey.success": "Key rotated",
+  "prompt.action.rotateKeypoolLiveKey.error": "Failed to rotate key",
+  "prompt.action.keypoolLiveDashboard": "KeypoolLive usage dashboard",
   "prompt.action.enhanceDescription":
     "The 'Enhance Prompt' button helps improve your prompt by providing additional context, clarification, or rephrasing. Try typing a prompt in here and clicking the button again to see how it works.",
   "speechToText.tooltip.start": "Start voice input with Kilo Gateway",
@@ -381,6 +386,9 @@ export const dict = {
   "settings.providers.connected.environmentDescription": "Connected from your environment variables",
   "settings.providers.action.signInChatGPT": "Sign in with ChatGPT",
   "settings.providers.custom.description": "Add a custom provider by base URL.",
+  "settings.providers.keypoollive.aggressiveRotation.title": "Aggressive Rotation",
+  "settings.providers.keypoollive.aggressiveRotation.description":
+    "Rotate the KeypoolLive key before every request instead of only after a failure.",
 
   "provider.custom.title": "Custom provider",
   "provider.custom.description.prefix": "Configure a custom provider. See the ",

@@ -21,6 +21,8 @@
 
 ---
 
+> **This is the `keypool-live` fork** ([TEA-ching/kilocode](https://github.com/TEA-ching/kilocode)) of the upstream [Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode) project. It adds a vault-backed `keypoollive` pseudo-provider so you can use Kilo without managing your own API keys for every model provider. See [**KeyPool Live — about this fork**](#keypool-live--about-this-fork) below for what's different and how to install it. Everything else in this README describes stock Kilo Code.
+
 Kilo Code is an AI coding agent that meets you everywhere you work: [VS Code](https://kilo.ai/landing/vs-code), [JetBrains](https://kilo.ai/features/jetbrains-native), and the [CLI](https://kilo.ai/cli). It's open source with open pricing. You pick from 500+ models, switch between them mid-task, and pay the model provider's rate with zero markup. No API keys required to start.
 
 ### Installation
@@ -152,6 +154,63 @@ kilo run --auto "run tests and fix any failures"
 ### Documentation
 
 For configuration and everything else, [head over to the docs](https://kilo.ai/docs).
+
+### KeyPool Live — about this fork
+
+Stock Kilo Code connects to model providers with your own API keys, one provider at a time. This
+fork adds **`keypoollive`**, a pseudo-provider that resolves keys, models, and providers from an
+encrypted vault instead — useful if you'd rather manage a pool of shared/rotating keys centrally
+(e.g. across a team) than paste individual provider keys into every machine running Kilo.
+
+**What it adds on top of upstream:**
+
+- **Vault-backed provider (`keypoollive`)** — appears in the model picker like any other
+  connected provider; every model available in the vault shows up automatically, no per-model
+  configuration needed.
+- **Key rotation** — round-robin across the vault's keys per provider, with automatic
+  cooldown/failover on errors. A manual "rotate" button sits next to the model selector in the
+  chat input whenever a `keypoollive/...` model is selected, and an **Aggressive Rotation**
+  toggle (Settings → Providers) rotates the key before every request instead of only on failure.
+- **Usage dashboard** — a per-key/provider/model breakdown of token usage and errors, opened from
+  the same button row in the chat input, backed by local or remote (shared) storage.
+- **Extra providers**: Cohere and Poolside, in addition to everything upstream Kilo already
+  supports.
+- **Renamed identity, so both forks install side by side**: the extension ships as
+  `sctg.keypool-code` (instead of `kilocode.kilo-code`) and the CLI as
+  `@sctg/keypool-code-cli` (instead of `@kilocode/cli`) in this fork's preview builds — you can
+  have the real Kilo Code and this fork installed at the same time without either one clobbering
+  the other.
+- **`kilocode-download`** (`packages/kilocode-download/`) — a small Rust CLI that fetches the
+  latest (or a specific) preview build's VSIX or CLI directly from this repo's
+  [GitHub Releases](https://github.com/TEA-ching/kilocode/releases), and can update an existing
+  install in place with `--update`.
+- **Automated upstream sync** — a backport agent keeps this branch current with
+  `Kilo-Org/kilocode`'s `main`, flagging anything that touches a file this fork customizes so a
+  merge conflict can't silently clobber (or be silently clobbered by) this fork's changes.
+
+**How the vault works:** `keypoollive` talks to the same encrypted vault backend used by the
+`keypool-live` fork of [cline](https://github.com/TEA-ching/cline) — point it at your vault with
+two environment variables:
+
+```bash
+export KEYPOOL_VAULT_URL="https://your-vault-endpoint"
+export KEYPOOL_LIVE_SECRET="your-vault-secret"
+```
+
+Optionally, to share usage stats across machines instead of keeping them local:
+
+```bash
+export KEYPOOL_LIVE_REMOTE_STORAGE_URL="https://your-usage-storage-endpoint"
+```
+
+Once set, `keypoollive` appears as a connected provider automatically — no extra configuration
+needed inside Kilo itself.
+
+**Installing this fork:** grab a VSIX/CLI build from the
+[preview releases](https://github.com/TEA-ching/kilocode/releases) (tagged `preview/<date>`),
+either directly or via `kilocode-download`. See
+[`.github/workflows/keypool-live-preview.yml`](.github/workflows/keypool-live-preview.yml) for
+how those builds are produced.
 
 ### Contributing
 

@@ -1161,6 +1161,28 @@ export interface ToggleSandboxMessage {
   contextDirectory?: string
 }
 
+export interface RotateKeypoolLiveKeyMessage {
+  type: "rotateKeypoolLiveKey"
+  vaultProviderName: string
+  requestID: string
+}
+
+export interface RequestKeypoolLiveUsageMessage {
+  type: "requestKeypoolLiveUsage"
+  period: "hour" | "day" | "week" | "month"
+  requestID: string
+}
+
+export interface RequestKeypoolLiveErrorsMessage {
+  type: "requestKeypoolLiveErrors"
+  requestID: string
+}
+
+export interface PurgeKeypoolLiveStatsMessage {
+  type: "purgeKeypoolLiveStats"
+  requestID: string
+}
+
 export interface ToggleRemoteMessage {
   type: "toggleRemote"
 }
@@ -1539,6 +1561,10 @@ export type WebviewMessage =
   | RequestSandboxDefaultMessage
   | SetSandboxDefaultMessage
   | ToggleSandboxMessage
+  | RotateKeypoolLiveKeyMessage
+  | RequestKeypoolLiveUsageMessage
+  | RequestKeypoolLiveErrorsMessage
+  | PurgeKeypoolLiveStatsMessage
   | FetchMarketplaceDataMessage
   | FilterMarketplaceItemsMessage
   | InstallMarketplaceItemMessage

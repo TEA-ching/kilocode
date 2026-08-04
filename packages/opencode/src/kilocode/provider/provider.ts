@@ -13,8 +13,12 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { optionalOmitUndefined } from "@opencode-ai/core/schema"
 import { ProviderError } from "@/provider/error"
 import { Effect, Schema } from "effect"
-import type { LanguageModelV3 } from "@ai-sdk/provider"
+import { wrapLanguageModel } from "ai"
+import type { LanguageModelV3, LanguageModelV3StreamPart, LanguageModelV3Usage } from "@ai-sdk/provider"
 import { mapValues, omit, pickBy } from "remeda"
+import { getLastSelectedKeyInfo } from "@/plugin/keypoollive"
+import * as KeypoolUsageDb from "@opencode-ai/core/keypoollive/usage-db"
+import { combinedModelId } from "@opencode-ai/core/keypoollive/types"
 
 /** Default timeout (ms) for provider HTTP requests (connection phase). */
 export const REQUEST_TIMEOUT_MS = 300_000 // 5 minutes
@@ -132,8 +136,104 @@ export function patchKiloProviderPrivacy(provider: { options?: Record<string, an
   provider.options = { ...provider.options, dataCollection: "deny" }
 }
 
+// ---------------------------------------------------------------------------
+// KeypoolLive usage recording
+//
+// Token counts are only available after the AI SDK finishes parsing a response
+// (streaming or not) — packages/opencode/src/plugin/keypoollive.ts's rotating
+// `fetch` intercepts before that point, so it can't extract them itself (see that
+// file's top comment). `wrapLanguageModel`'s `wrapGenerate`/`wrapStream` middleware is
+// the one place both paths converge with a normalized `usage` object, and it's the
+// same utility packages/opencode/src/session/llm.ts already uses (`transformParams`)
+// — not a new mechanism. Key identity comes from
+// packages/opencode/src/plugin/keypoollive.ts's `getLastSelectedKeyInfo()`: best-effort
+// (keyed by vault provider name, can race under concurrent requests to the same vault
+// sub-provider), same accepted approximation as that module's rotation being global
+// rather than per-session — see .backport-agent/customizations.yaml.
+// ---------------------------------------------------------------------------
+
+function extractErrorCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") return null
+  const e = error as Record<string, unknown>
+  const candidates = [e["statusCode"], e["status"], (e["response"] as Record<string, unknown> | undefined)?.["status"]]
+  for (const c of candidates) {
+    if (typeof c === "number") return c
+  }
+  return null
+}
+
+function recordKeypoolliveUsage(vaultProviderName: string, modelID: string, usage: LanguageModelV3Usage): void {
+  const key = getLastSelectedKeyInfo(vaultProviderName)
+  KeypoolUsageDb.recordUsage({
+    provider: vaultProviderName,
+    // `combinedModelId` avoids a double-prefixed id for protocols whose wire model id already
+    // starts with the vault provider name (e.g. poolside's "poolside/laguna-xs-2.1") — same fix
+    // as the catalog id in packages/opencode/src/plugin/keypoollive.ts.
+    modelId: combinedModelId(vaultProviderName, modelID),
+    keyOwner: key?.keyOwner ?? "unknown",
+    keyHint: key?.keyHint ?? "unknown",
+    promptTokens: usage.inputTokens.total ?? 0,
+    completionTokens: usage.outputTokens.total ?? 0,
+  })
+}
+
+function recordKeypoolliveError(vaultProviderName: string, modelID: string, error: unknown): void {
+  const key = getLastSelectedKeyInfo(vaultProviderName)
+  KeypoolUsageDb.recordError({
+    provider: vaultProviderName,
+    modelId: combinedModelId(vaultProviderName, modelID),
+    keyOwner: key?.keyOwner ?? "unknown",
+    keyHint: key?.keyHint ?? "unknown",
+    errorCode: extractErrorCode(error),
+  })
+}
+
 export function kiloCustomLoaders(dep: CustomDep): Record<string, CustomLoader> {
   return {
+    keypoollive: () =>
+      Effect.succeed({
+        autoload: true,
+        async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          const raw = sdk.languageModel(modelID)
+          const vaultProviderName = options?.["vaultProviderName"]
+          if (typeof vaultProviderName !== "string") return raw
+          return wrapLanguageModel({
+            model: raw,
+            middleware: {
+              specificationVersion: "v3" as const,
+              async wrapGenerate({ doGenerate }) {
+                try {
+                  const result = await doGenerate()
+                  recordKeypoolliveUsage(vaultProviderName, modelID, result.usage)
+                  return result
+                } catch (error) {
+                  recordKeypoolliveError(vaultProviderName, modelID, error)
+                  throw error
+                }
+              },
+              async wrapStream({ doStream }) {
+                try {
+                  const { stream, ...rest } = await doStream()
+                  const observed = stream.pipeThrough(
+                    new TransformStream<LanguageModelV3StreamPart, LanguageModelV3StreamPart>({
+                      transform(chunk, controller) {
+                        if (chunk.type === "finish") recordKeypoolliveUsage(vaultProviderName, modelID, chunk.usage)
+                        if (chunk.type === "error") recordKeypoolliveError(vaultProviderName, modelID, chunk.error)
+                        controller.enqueue(chunk)
+                      },
+                    }),
+                  )
+                  return { stream: observed, ...rest }
+                } catch (error) {
+                  recordKeypoolliveError(vaultProviderName, modelID, error)
+                  throw error
+                }
+              },
+            },
+          })
+        },
+      }),
+
     "github-copilot-enterprise": () =>
       Effect.succeed({
         autoload: false,

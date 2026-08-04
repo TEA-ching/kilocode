@@ -32,6 +32,7 @@ import { EnhancePromptApi } from "@/kilocode/server/httpapi/groups/enhance-promp
 import { IndexingApi } from "@/kilocode/server/httpapi/groups/indexing"
 import { InstanceReloadApi } from "@/kilocode/server/httpapi/groups/instance-reload"
 import { InteractiveTerminalApi } from "@/kilocode/server/httpapi/groups/interactive-terminal"
+import { KeypoolLiveApi } from "@/kilocode/server/httpapi/groups/keypoollive" // kilocode_change - keypool-live fork
 import { KiloGatewayApi } from "@/kilocode/server/httpapi/groups/kilo-gateway"
 import { KilocodeApi } from "@/kilocode/server/httpapi/groups/kilocode"
 import { NetworkApi } from "@/kilocode/server/httpapi/groups/network"
@@ -82,6 +83,7 @@ export const InstanceHttpApi = HttpApi.make("opencode-instance")
   .addHttpApi(IndexingApi)
   .addHttpApi(InstanceReloadApi)
   .addHttpApi(InteractiveTerminalApi)
+  .addHttpApi(KeypoolLiveApi) // kilocode_change - keypool-live fork
   .addHttpApi(KiloGatewayApi)
   .addHttpApi(KilocodeApi)
   .addHttpApi(NetworkApi)

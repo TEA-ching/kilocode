@@ -1,0 +1,551 @@
+# keypool-live fork — Preview Release
+#
+# Builds a VS Code extension VSIX and CLI binaries/npm package for the keypool-live fork
+# (TEA-ching/kilocode), with both renamed away from the real kilocode identity so both
+# tools can be installed side by side without ID collisions:
+#   - VS Code extension: kilocode.kilo-code  -> sctg.keypool-code
+#   - CLI npm package:   @kilocode/cli       -> @sctg/keypool-code-cli
+#
+# Mirrors the equivalent workflow in the cline fork (.github/workflows/keypool-live-preview.yml
+# there), adapted to kilocode's own build tooling (packages/opencode/script/build.ts,
+# packages/kilo-vscode/script/build.ts, @opencode-ai/script's Script.{version,channel,preview}).
+#
+# All identity renaming happens on the CI checkout only (via jq/sed), never committed —
+# packages/opencode/package.json, packages/opencode/bin/kilo, and
+# packages/kilo-vscode/package.json in the real branch stay untouched.
+
+name: keypool-live-preview
+
+on:
+  push:
+    branches:
+      - keypool-live
+    paths:
+      - "packages/kilo-vscode/**"
+      - "packages/opencode/**"
+      - "packages/core/**"
+      - "packages/sdk/**"
+      - ".github/workflows/keypool-live-preview.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: keypool-live-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  id-token: write # npm trusted publishing (OIDC) for the renamed CLI package
+
+env:
+  KILO_CHANNEL: keypool-live
+  KILO_PRE_RELEASE: "true"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Compute shared metadata (datetime) once, shared across all jobs.
+  # ─────────────────────────────────────────────────────────────────────────────
+  setup:
+    name: Compute build metadata
+    runs-on: ubuntu-24.04
+    if: github.repository == 'TEA-ching/kilocode'
+    outputs:
+      datetime: ${{ steps.meta.outputs.datetime }}
+      datetime_safe: ${{ steps.meta.outputs.datetime_safe }}
+    steps:
+      - name: Compute datetime
+        id: meta
+        run: |
+          DATETIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          DATETIME_SAFE=$(echo "$DATETIME" | tr ':' '-')
+          echo "datetime=$DATETIME"           >> "$GITHUB_OUTPUT"
+          echo "datetime_safe=$DATETIME_SAFE" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. Build CLI binaries (all platforms) under the renamed @sctg/keypool-code-cli
+  #    identity, reusing the real packages/opencode/script/build.ts unmodified.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-cli:
+    name: Build CLI binaries (renamed for SCTG)
+    needs: setup
+    runs-on: ubuntu-2404
+    if: github.repository == 'TEA-ching/kilocode'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-tags: true
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Setup Zig for Linux sandbox helpers
+        run: |
+          curl --fail --location --retry 3 \
+            https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz \
+            --output "$RUNNER_TEMP/zig.tar.xz"
+          echo "473ec26806133cf4d1918caf1a410f8403a13d979726a9045b421b685031a982  $RUNNER_TEMP/zig.tar.xz" | sha256sum --check --status
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-linux-x86_64-0.14.0" >> "$GITHUB_PATH"
+
+      # packages/opencode/script/build.ts derives its dist/ folder names dynamically from
+      # this file's "name" field, so patching it here is enough to rename every per-arch
+      # dist package it produces — no other part of build.ts hardcodes "@kilocode/cli".
+      - name: Rename CLI package identity to @sctg/keypool-code-cli
+        run: |
+          jq '.name = "@sctg/keypool-code-cli" |
+              .repository.url = "https://github.com/TEA-ching/kilocode" |
+              .homepage = "https://github.com/TEA-ching/kilocode"' \
+            packages/opencode/package.json > /tmp/opencode-package.json.tmp
+          mv /tmp/opencode-package.json.tmp packages/opencode/package.json
+
+          # packages/opencode/bin/kilo (the published npm wrapper) hardcodes the platform
+          # package name it resolves at runtime ("@kilocode/cli-" + platform + "-" + arch).
+          # Without this, a published @sctg/keypool-code-cli would install fine but fail at
+          # first run trying to require() the un-renamed platform package.
+          sed -i.bak 's#@kilocode/cli-#@sctg/keypool-code-cli-#' packages/opencode/bin/kilo
+          rm packages/opencode/bin/kilo.bak
+
+      - name: Build
+        working-directory: packages/opencode
+        run: ./script/build.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Pack CLI dist into tar.zst
+        run: |
+          find packages/opencode/dist -name '*.map' -delete
+          tar --zstd -cf /tmp/keypool-cli.tar.zst -C packages/opencode/dist .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: /tmp/keypool-cli.tar.zst
+          archive: false
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Build the VSIX under the renamed sctg.keypool-code identity, reusing the
+  #    real packages/kilo-vscode/script/build.ts unmodified.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-vscode:
+    name: Build VSIX (renamed for SCTG)
+    needs: build-cli
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'TEA-ching/kilocode'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-bun
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install @vscode/vsce
+        run: bun install -g @vscode/vsce
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: keypool-cli.tar.zst
+          path: /tmp
+          skip-decompress: true
+
+      - name: Unpack CLI dist
+        run: |
+          mkdir -p packages/opencode/dist
+          tar --zstd -xf /tmp/keypool-cli.tar.zst -C packages/opencode/dist
+
+      # packages/kilo-vscode/script/build.ts has a hardcoded per-target list of
+      # "@kilocode/cli-<target>" dist directory names to pick binaries up from. Rather than
+      # patching that shared, committed script, alias the renamed dist dirs back to the
+      # names it already expects via symlinks — zero changes to any tracked file.
+      - name: Alias renamed CLI dist dirs back to @kilocode/cli-* for the VSIX build script
+        run: |
+          mkdir -p /tmp/cli-dist-aliased/@kilocode
+          for dir in packages/opencode/dist/@sctg/keypool-code-cli-*; do
+            base=$(basename "$dir")
+            suffix=${base#keypool-code-cli-}
+            ln -s "$(pwd)/$dir" "/tmp/cli-dist-aliased/@kilocode/cli-$suffix"
+          done
+
+      - name: Rename extension identity to sctg.keypool-code
+        run: |
+          jq '.name = "keypool-code" |
+              .publisher = "sctg" |
+              .displayName = "Keypool Code (KeyPool Live Preview)" |
+              .repository.url = "https://github.com/TEA-ching/kilocode" |
+              .homepage = "https://github.com/TEA-ching/kilocode" |
+              .author.name = (.author.name + " - SCTG Development")' \
+            packages/kilo-vscode/package.json > /tmp/kilo-vscode-package.json.tmp
+          mv /tmp/kilo-vscode-package.json.tmp packages/kilo-vscode/package.json
+
+      - name: Build VSIX packages
+        working-directory: packages/kilo-vscode
+        run: bun script/build.ts
+        env:
+          CLI_DIST_DIR: /tmp/cli-dist-aliased
+          GH_REPO: ${{ github.repository }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: keypool-vscode
+          path: packages/kilo-vscode/out
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. Publish the renamed CLI npm package (best-effort — requires npm trusted
+  #    publishing to already be configured for @sctg/keypool-code-cli on npmjs.com;
+  #    does not block the VSIX/CLI-binary preview release below if it fails).
+  # ─────────────────────────────────────────────────────────────────────────────
+  publish-cli-npm:
+    name: Publish CLI to npm (@sctg/keypool-code-cli)
+    needs: build-cli
+    runs-on: ubuntu-24.04
+    if: github.repository == 'TEA-ching/kilocode'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-bun
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify npm trusted publishing prerequisites
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "GitHub OIDC request environment is unavailable. Ensure this job has id-token: write for npm trusted publishing."
+            exit 1
+          fi
+          NPM_VERSION=$(npm --version)
+          echo "npm ${NPM_VERSION}"
+          IFS=. read -r major minor patch <<EOF
+          ${NPM_VERSION}
+          EOF
+          if [ "$major" -lt 11 ] || { [ "$major" -eq 11 ] && [ "$minor" -lt 5 ]; } || { [ "$major" -eq 11 ] && [ "$minor" -eq 5 ] && [ "$patch" -lt 1 ]; }; then
+            echo "npm 11.5.1 or newer is required for trusted publishing"
+            exit 1
+          fi
+          echo "GitHub OIDC request environment is available for npm trusted publishing."
+          echo "NOTE: @sctg/keypool-code-cli (and its per-platform sub-packages) must have a"
+          echo "trusted publisher configured on npmjs.com for this repo+workflow before this"
+          echo "job's 'npm publish' calls can succeed. First run is expected to fail until"
+          echo "that's set up — see the workflow file header."
+
+      - name: Rename CLI package identity to @sctg/keypool-code-cli
+        run: |
+          jq '.name = "@sctg/keypool-code-cli" |
+              .repository.url = "https://github.com/TEA-ching/kilocode" |
+              .homepage = "https://github.com/TEA-ching/kilocode"' \
+            packages/opencode/package.json > /tmp/opencode-package.json.tmp
+          mv /tmp/opencode-package.json.tmp packages/opencode/package.json
+          sed -i.bak 's#@kilocode/cli-#@sctg/keypool-code-cli-#' packages/opencode/bin/kilo
+          rm packages/opencode/bin/kilo.bak
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: keypool-cli.tar.zst
+          path: /tmp
+          skip-decompress: true
+
+      - name: Unpack CLI dist
+        run: |
+          mkdir -p packages/opencode/dist
+          tar --zstd -xf /tmp/keypool-cli.tar.zst -C packages/opencode/dist
+
+      - name: Publish
+        working-directory: packages/opencode
+        run: ./script/publish.ts
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Build kilocode-download (packages/kilocode-download), the Rust
+  #    download/update tool — same principle as cline's clinepool-download.
+  #    Linux is built via a multi-arch Docker image (needs DOCKER_USERNAME/
+  #    DOCKER_PASSWORD secrets on this repo — best-effort, does not block the
+  #    release below if unset); Windows/macOS build natively and don't need
+  #    Docker Hub at all.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-kilocode-download-for-linux-on-docker:
+    name: Build kilocode-download (linux, Docker multi-arch)
+    needs: setup
+    runs-on: ubuntu-24.04
+    if: github.repository == 'TEA-ching/kilocode'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get kilocode-download version
+        id: kilocode-download-version
+        run: |
+          VERSION=$(grep '^version' ./packages/kilocode-download/Cargo.toml | cut -d '"' -f 2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: "linux/arm64,linux/amd64"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
+
+      - name: Extract metadata for Docker
+        id: docker-meta
+        uses: docker/metadata-action@v6
+        with:
+          images: sctg/kilocode-download
+          tags: |
+            type=raw,value=preview-${{ needs.setup.outputs.datetime_safe }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: packages/kilocode-download/.
+          file: packages/kilocode-download/Dockerfile
+          platforms: linux/arm64, linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+          tags: ${{ steps.docker-meta.outputs.tags }}
+          labels: ${{ steps.docker-meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.kilocode-download-version.outputs.version }}
+            BUILD_DATE=${{ needs.setup.outputs.datetime }}
+
+      - name: Extract binaries from Docker images
+        env:
+          VERSION: ${{ steps.kilocode-download-version.outputs.version }}
+          DATETIME_SAFE: ${{ needs.setup.outputs.datetime_safe }}
+        run: |
+          declare -A PLATFORM_TO_ARCH=(
+            ["linux/arm64"]="arm64"
+            ["linux/amd64"]="amd64"
+          )
+
+          mkdir -p kilocode-download-binaries
+
+          for PLATFORM in linux/arm64 linux/amd64; do
+            if [ "${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}" != "true" ]; then
+              echo "DOCKER_USERNAME/DOCKER_PASSWORD not configured on this repo — skipping linux kilocode-download binaries."
+              echo "See the workflow file header: this job is best-effort and does not block the preview release."
+              exit 1
+            fi
+            IMAGE_NAME="sctg/kilocode-download:preview-${DATETIME_SAFE}"
+            docker pull "${IMAGE_NAME}"
+
+            ARCH=${PLATFORM_TO_ARCH[$PLATFORM]}
+            ARTIFACT_NAME="kilocode-download_linux_${ARCH}_${VERSION}"
+            PLATFORM_SAFE=$(echo "$PLATFORM" | tr '/' '-')
+
+            CONTAINER_NAME="extract-$PLATFORM_SAFE"
+            docker create --platform "$PLATFORM" --name "$CONTAINER_NAME" "${IMAGE_NAME}"
+            mkdir -p /tmp/extracted
+            docker cp "$CONTAINER_NAME:/usr/local/bin/kilocode-download" "/tmp/extracted/${ARTIFACT_NAME}"
+            chmod +x "/tmp/extracted/${ARTIFACT_NAME}"
+            cp "/tmp/extracted/${ARTIFACT_NAME}" "kilocode-download-binaries/"
+            docker rm "$CONTAINER_NAME" || true
+            rm -f "/tmp/extracted/${ARTIFACT_NAME}" || true
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kilocode-download-binaries-linux
+          path: kilocode-download-binaries/*
+          if-no-files-found: error
+
+  build-kilocode-download-for-windows-and-macos:
+    needs: setup
+    name: Build kilocode-download ${{ matrix.family }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    if: github.repository == 'TEA-ching/kilocode'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: amd64
+            family: windows
+            ext: .exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            arch: arm64
+            family: macos
+            ext: ""
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            arch: amd64
+            family: macos
+            ext: ""
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get kilocode-download version
+        shell: bash
+        id: kilocode-download-version
+        run: |
+          VERSION=$(grep '^version' ./packages/kilocode-download/Cargo.toml | cut -d '"' -f 2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build native binary
+        working-directory: ./packages/kilocode-download
+        run: cargo build --verbose --release --target ${{ matrix.target }}
+
+      - name: Prepare binary artifact
+        id: prepare-artifact
+        shell: bash
+        env:
+          VERSION: ${{ steps.kilocode-download-version.outputs.version }}
+        run: |
+          binary_name="kilocode-download"
+          artifact_name="kilocode-download_${{ matrix.family }}_${{ matrix.arch }}_${VERSION}${{ matrix.ext }}"
+          cp "packages/kilocode-download/target/${{ matrix.target }}/release/${binary_name}${{ matrix.ext }}" "$artifact_name"
+          echo "artifact_path=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kilocode-download-binaries-${{ matrix.family }}-${{ matrix.arch }}
+          path: "${{ steps.prepare-artifact.outputs.artifact_path }}"
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 6. Gather VSIX + raw CLI binaries + kilocode-download binaries and publish a
+  #    GitHub pre-release. Does not hard-depend on publish-cli-npm or the linux
+  #    kilocode-download build succeeding — both are best-effort and gated on
+  #    external secrets (npm trusted publishing / Docker Hub) that may not be
+  #    configured yet on a fresh fork.
+  # ─────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub pre-release
+    needs: [setup, build-cli, build-vscode, build-kilocode-download-for-windows-and-macos]
+    runs-on: ubuntu-24.04
+    if: github.repository == 'TEA-ching/kilocode'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate release notes from recent commits
+        run: |
+          PREV=$(git tag --sort=-creatordate --list 'preview/*' | head -1 || true)
+          if [ -n "$PREV" ]; then
+            LOG=$(git log --oneline --no-merges --pretty=format:"- %s (%h)" "${PREV}..HEAD")
+          else
+            LOG=$(git log --oneline --no-merges --pretty=format:"- %s (%h)" -30)
+          fi
+          {
+            printf "**Branch:** \`keypool-live\`  **Commit:** \`%s\`\n\n" "${{ github.sha }}"
+            printf "Extension renamed to \`sctg.keypool-code\`, CLI renamed to \`@sctg/keypool-code-cli\`"
+            printf " so both can be installed alongside the real kilocode extension/CLI. Use"
+            printf " \`kilocode-download\` (attached below) to fetch/update the VSIX or CLI for"
+            printf " your platform directly from this release.\n\n"
+            printf "### Changes\n\n"
+            echo "$LOG"
+          } > release-notes.md
+          echo "--- Release notes preview ---"
+          cat release-notes.md
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: keypool-vscode
+          path: release-assets/
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: keypool-cli.tar.zst
+          path: /tmp
+          skip-decompress: true
+
+      - name: Unpack CLI dist and package raw binaries for the release
+        run: |
+          mkdir -p packages/opencode/dist release-assets/cli
+          tar --zstd -xf /tmp/keypool-cli.tar.zst -C packages/opencode/dist
+          # The artifact was built under the renamed @sctg/keypool-code-cli identity (see
+          # build-cli's rename step) — dist dirs are already named keypool-code-cli-<target>.
+          #
+          # opencode's own build.ts target vocabulary (windows-*, *-musl) differs from the
+          # VSIX's (win32-*, alpine-*) — translate to the VSIX's vocabulary here so
+          # kilocode-download can use ONE platform enum for both --cli and --vsix instead of
+          # two different naming schemes for the same physical platforms.
+          for dir in packages/opencode/dist/@sctg/keypool-code-cli-*; do
+            base=$(basename "$dir")
+            suffix=${base#keypool-code-cli-}
+            case "$suffix" in
+              *-baseline) continue ;;
+            esac
+            case "$suffix" in
+              windows-x64) platform=win32-x64 ;;
+              windows-arm64) platform=win32-arm64 ;;
+              linux-x64-musl) platform=alpine-x64 ;;
+              linux-arm64-musl) platform=alpine-arm64 ;;
+              *) platform=$suffix ;;
+            esac
+            if [[ "$platform" == win32-* ]]; then
+              (cd "$dir/bin" && zip -qr "$GITHUB_WORKSPACE/release-assets/cli/keypool-code-cli-${platform}.zip" .)
+            else
+              tar -czf "release-assets/cli/keypool-code-cli-${platform}.tar.gz" -C "$dir/bin" .
+            fi
+          done
+
+      - name: Download kilocode-download binaries (windows/macOS — always built)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: kilocode-download-binaries-windows-*
+          path: release-assets/kilocode-download/
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: kilocode-download-binaries-macos-*
+          path: release-assets/kilocode-download/
+          merge-multiple: true
+
+      # Best-effort: only present if DOCKER_USERNAME/DOCKER_PASSWORD are configured on this
+      # repo (see build-kilocode-download-for-linux-on-docker). Missing this artifact must
+      # not fail the whole release.
+      - name: Download kilocode-download binaries (linux — best-effort)
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: kilocode-download-binaries-linux
+          path: release-assets/kilocode-download/
+
+      - name: List release assets
+        run: ls -lhR release-assets/
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATETIME: ${{ needs.setup.outputs.datetime }}
+          DATETIME_SAFE: ${{ needs.setup.outputs.datetime_safe }}
+        run: |
+          TAG="preview/${DATETIME_SAFE}"
+          TITLE="KeyPool Code Preview ${DATETIME}"
+
+          # kilocode-download/ may be empty (or absent) if the linux Docker build was
+          # skipped and no windows/macos artifact existed for some reason — glob it
+          # conditionally so gh release create never errors on "no matching files".
+          ASSETS=(release-assets/*.vsix release-assets/cli/*)
+          if compgen -G "release-assets/kilocode-download/*" > /dev/null; then
+            ASSETS+=(release-assets/kilocode-download/*)
+          fi
+
+          gh release create "$TAG" \
+            --prerelease \
+            --title "$TITLE" \
+            --notes-file release-notes.md \
+            "${ASSETS[@]}"

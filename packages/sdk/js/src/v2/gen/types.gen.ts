@@ -11851,6 +11851,148 @@ export type InteractiveTerminalCloseResponses = {
 export type InteractiveTerminalCloseResponse =
   InteractiveTerminalCloseResponses[keyof InteractiveTerminalCloseResponses]
 
+export type KeypoolliveRotateData = {
+  body?: {
+    vaultProviderName: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/keypoollive/rotate"
+}
+
+export type KeypoolliveRotateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type KeypoolliveRotateError = KeypoolliveRotateErrors[keyof KeypoolliveRotateErrors]
+
+export type KeypoolliveRotateResponses = {
+  /**
+   * Whether a key rotation was recorded
+   */
+  200: {
+    rotated: boolean
+  }
+}
+
+export type KeypoolliveRotateResponse = KeypoolliveRotateResponses[keyof KeypoolliveRotateResponses]
+
+export type KeypoolliveUsageData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+    period?: "hour" | "day" | "week" | "month"
+  }
+  url: "/keypoollive/usage"
+}
+
+export type KeypoolliveUsageErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type KeypoolliveUsageError = KeypoolliveUsageErrors[keyof KeypoolliveUsageErrors]
+
+export type KeypoolliveUsageResponses = {
+  /**
+   * KeypoolLive usage stats for the requested period
+   */
+  200: {
+    storageMode: "local" | "remote"
+    stats: Array<{
+      period: string
+      provider: string
+      modelId: string
+      keyOwner: string
+      keyHint: string
+      promptTokens: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      completionTokens: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      requestCount: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    }>
+  }
+}
+
+export type KeypoolliveUsageResponse = KeypoolliveUsageResponses[keyof KeypoolliveUsageResponses]
+
+export type KeypoolliveErrorsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/keypoollive/errors"
+}
+
+export type KeypoolliveErrorsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type KeypoolliveErrorsError = KeypoolliveErrorsErrors[keyof KeypoolliveErrorsErrors]
+
+export type KeypoolliveErrorsResponses = {
+  /**
+   * KeypoolLive error stats
+   */
+  200: {
+    storageMode: "local" | "remote"
+    stats: Array<{
+      provider: string
+      keyOwner: string
+      keyHint: string
+      totalRequests: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      errorCount: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      errorRate: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      lastErrorCode: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    }>
+  }
+}
+
+export type KeypoolliveErrorsResponse = KeypoolliveErrorsResponses[keyof KeypoolliveErrorsResponses]
+
+export type KeypoollivePurgeData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/keypoollive/purge"
+}
+
+export type KeypoollivePurgeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type KeypoollivePurgeError = KeypoollivePurgeErrors[keyof KeypoollivePurgeErrors]
+
+export type KeypoollivePurgeResponses = {
+  /**
+   * Bytes freed by the purge
+   */
+  200: {
+    freedBytes: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  }
+}
+
+export type KeypoollivePurgeResponse = KeypoollivePurgeResponses[keyof KeypoollivePurgeResponses]
+
 export type KiloProfileData = {
   body?: never
   path?: never

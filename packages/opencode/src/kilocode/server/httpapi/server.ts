@@ -20,6 +20,7 @@ import { enhancePromptHandlers } from "./handlers/enhance-prompt"
 import { indexingHandlers } from "./handlers/indexing"
 import { instanceReloadHandlers } from "./handlers/instance-reload"
 import { interactiveTerminalHandlers } from "./handlers/interactive-terminal"
+import { keypoolLiveHandlers } from "./handlers/keypoollive"
 import { kiloGatewayHandlers } from "./handlers/kilo-gateway"
 import { kilocodeHandlers } from "./handlers/kilocode"
 import { memoryHandlers } from "./handlers/memory"
@@ -41,6 +42,7 @@ export const provide = Layer.provide([
   indexingHandlers,
   instanceReloadHandlers,
   interactiveTerminalHandlers,
+  keypoolLiveHandlers,
   kiloGatewayHandlers,
   kilocodeHandlers,
   memoryHandlers,

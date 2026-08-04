@@ -1,0 +1,423 @@
+# customizations.yaml
+# Map of keypool-live fork customizations (TEA-ching/kilocode)
+# Upstream: Kilo-Org/kilocode, branch main
+# Fork branch: keypool-live
+#
+# Role: guide the backport agent to detect sensitive conflicts, pick an
+# appropriate validation level, and avoid silently clobbering a fork feature.
+#
+# CONVENTIONS (backport-agent >= 0.8.0):
+#   - `paths`         : globs of files OWNED by the customization -> HIGH risk.
+#   - `related_files` : shared registration/wiring files also touched by upstream -> MEDIUM
+#                       risk, injected as context into the AI prompts.
+#   - `tests`         : trusted shell commands (run via bash by run_validation when the
+#                       agent passes the matching customizationIds). Keep these fast and
+#                       deterministic.
+#   - Deterministic verification of ALL invariants is centralized in
+#     .backport-agent/check-fork-invariants.sh (`bun run test:invariants`), which must
+#     stay the first command of every `tests` list.
+#
+# ARCHITECTURE NOTE — TWO PARALLEL PROVIDER SYSTEMS (do not confuse them):
+#   kilocode is mid-migration between two entirely separate provider-resolution systems.
+#   Getting this wrong means a "provider" that looks registered but is unreachable from real
+#   chat requests — this exact mistake was made and corrected while building keypoollive
+#   Phase 1 (see keypoollive-provider below), so read this before touching either system.
+#
+#   1. "v2" (packages/core/src/plugin/provider/*.ts + ProviderPlugins array in
+#      packages/core/src/plugin/provider.ts + Catalog.Service/AISDK.Service in
+#      packages/core/src/{catalog,aisdk}.ts). Providers not in models.dev must self-register
+#      via a `catalog.transform` hook (pattern: packages/core/src/plugin/models-dev.ts).
+#      THIS IS NOT THE LIVE REQUEST PATH. The only consumer of Catalog.Service today is the
+#      `kilo debug v2` CLI command (packages/opencode/src/cli/cmd/debug/v2.ts, literally
+#      described as "debug v2 catalog and built-in plugins"). Registering a provider only
+#      here makes it visible in that debug dump and nowhere else.
+#   2. "v1" (packages/opencode/src/provider/provider.ts, ~1900 lines, `Provider.Service`).
+#      THIS IS THE LIVE REQUEST PATH: packages/opencode/src/session/llm.ts calls
+#      `provider.getLanguage(model)` from here, never Catalog.Service. Its provider database
+#      is assembled from models.dev data merged with (a) the user's kilo.jsonc `provider:`
+#      config section and (b) opencode's OWN separate plugin system
+#      (packages/opencode/src/plugin/*.ts, `Hooks`-returning functions registered in
+#      `internalPlugins()` in packages/opencode/src/plugin/index.ts — unrelated to
+#      packages/core's PluginV2). A plugin's `provider.models()` hook can only ever augment an
+#      *existing* models.dev entry (provider.ts's loop does `if (!database[providerID])
+#      continue` before calling it — see digitalocean.ts's dynamic `router:` models for the
+#      pattern). A brand-new provider id unknown to models.dev (like keypoollive) can only be
+#      injected via the config layer — a plugin's `config(cfg)` hook mutating `cfg.provider`
+#      directly, which is what packages/opencode/src/plugin/keypoollive.ts does.
+#
+#   Poolside needed NEITHER system: it's already a genuine models.dev entry (id "poolside",
+#   npm "@ai-sdk/openai-compatible", api "https://inference.poolside.ai/v1", 3 "laguna" models)
+#   — verified directly against https://models.dev/api.json. It works with just a
+#   POOLSIDE_API_KEY env var and zero fork code. An earlier draft of this fork mistakenly
+#   added a self-registering v2 poolside.ts plugin (redundant with models.dev, and pointless
+#   since v2 isn't the live path anyway) — removed; do not re-add it.
+#
+# GOTCHA — the vault's "openai" protocol is NOT the real OpenAI API. Confirmed against a real
+#   vault: every "openai"-protocol entry (groq, morph, openrouter, sambanova, and even the
+#   vault's own "openai" entry) points at a custom/proxied endpoint, never api.openai.com.
+#   @ai-sdk/openai defaults some model families to OpenAI's Responses API (`/v1/responses`),
+#   which those proxies don't implement (confirmed failure: "Unsupported model ... for
+#   /v1/responses" against the vault's "morph" entry). Both keypoollive.ts files map protocol
+#   "openai" to `@ai-sdk/openai-compatible`, not `@ai-sdk/openai` — do not "fix" this back.
+#
+# GOTCHA — the AI SDK vendor packages (createMistral/createAnthropic/createOpenAICompatible/...)
+#   validate that SOME `apiKey` string is present at construction time and throw immediately if
+#   it's missing (e.g. "Mistral API key is missing"), even though keypoollive's real per-request
+#   key is injected by rewriting the auth header inside the dispatch `fetch`. Both
+#   keypoollive.ts files must set a placeholder `apiKey` (e.g. "keypoollive-managed") in the
+#   provider-level options passed to the SDK factory — it is never actually sent anywhere, but
+#   removing it breaks every protocol at SDK-construction time, not just at request time.
+#
+# GOTCHA — a real user had `KEYPOOL_USAGE_DB_DIR` set to the same URL as
+#   `KEYPOOL_LIVE_REMOTE_STORAGE_URL` (clearly meaning "use remote storage") without the latter
+#   being set — usage-db.ts silently fell back to local mode AND `path.join()` silently accepted
+#   the URL as a directory, writing usage.ndjson to a bogus nested path
+#   ("<cwd>/https:/host/usage.ndjson") instead of erroring loudly. Fixed: `getDbDir()` rejects an
+#   http(s) `KEYPOOL_USAGE_DB_DIR` as a local path (falls back to the default XDG data dir
+#   instead, with a warning log), and `getEffectiveRemoteConfig()` now ALSO accepts an http(s)
+#   `KEYPOOL_USAGE_DB_DIR` as a remote-storage URL fallback when
+#   `KEYPOOL_LIVE_REMOTE_STORAGE_URL` itself isn't set. `KEYPOOL_USAGE_DB_DIR` must never be
+#   trusted as a path without validating it doesn't look like a URL.
+
+customizations:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. KeypoolLive vault-backed pseudo-provider
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-provider
+    description: >
+      Adds the "keypoollive" pseudo-provider: resolves API keys/models/providers from an
+      encrypted vault (same ai-proxy-cloudflare backend and wire format as the cline fork —
+      KEYPOOL_VAULT_URL / KEYPOOL_LIVE_SECRET) instead of a single static API key. Includes
+      round-robin/cooldown key rotation and "Aggressive Rotation" (rotate before every real
+      HTTP call, not just on failure).
+
+      Registered in BOTH provider systems (see the architecture note above), but only one is
+      the real integration:
+        - packages/opencode/src/plugin/keypoollive.ts (LIVE): an opencode `Hooks` plugin whose
+          `config()` hook injects a `keypoollive` entry into `cfg.provider` with one model per
+          vault model. Since the shared `options.fetch` is provider-level but a vault model can
+          target any of several real protocols, each model tags its requests with an
+          `x-keypoollive-vault-provider` header; the one shared dispatch fetch reads (and
+          strips) that header to know which vault provider's keys/protocol to rotate and which
+          auth header style (bearer / x-api-key / x-goog-api-key) to rewrite.
+        - packages/core/src/plugin/provider/keypoollive.ts (v2/debug-only): same idea via
+          Catalog.Service's `catalog.transform`/`aisdk.sdk` hooks. Kept because it's cheap and
+          gives `kilo debug v2` visibility, and because provider.ts (v1) may migrate to Catalog
+          eventually — but it does NOT by itself make keypoollive usable in a real session.
+      Both share the rotation/vault core in packages/core/src/keypoollive/{vault,keypool}.ts.
+    paths:
+      - "packages/core/src/keypoollive/**"
+      - "packages/core/src/plugin/provider/keypoollive.ts"
+      - "packages/opencode/src/plugin/keypoollive.ts"
+    related_files:
+      - "packages/core/src/plugin/provider.ts"
+      - "packages/core/src/aisdk.ts"
+      - "packages/core/src/catalog.ts"
+      - "packages/core/src/plugin.ts"
+      - "packages/core/src/model.ts"
+      - "packages/core/src/global.ts"
+      - "packages/core/src/plugin/models-dev.ts"
+      - "packages/opencode/src/plugin/index.ts"
+      - "packages/opencode/src/provider/provider.ts"
+      - "packages/opencode/src/session/llm.ts"
+    invariants:
+      - "KeypoollivePlugin (v2) must stay imported and listed in ProviderPlugins (packages/core/src/plugin/provider.ts)."
+      - "KeypoolLivePlugin (v1, live path) must stay imported and listed in internalPlugins() (packages/opencode/src/plugin/index.ts), with kilocode_change markers on both the import and the array entry (shared upstream file)."
+      - "packages/opencode/src/plugin/keypoollive.ts must carry the '// kilocode_change - new file' marker at the top (new file under a SCOPES-checked path — see script/check-opencode-annotations.ts)."
+      - "packages/core/src/keypoollive/vault.ts must keep reading KEYPOOL_VAULT_URL / KEYPOOL_LIVE_SECRET — same env var names as the cline fork, so both forks can share one ai-proxy-cloudflare backend."
+      - "The AES-256-CBC/PBKDF2-SHA256 (100k iterations) decryption in vault.ts must stay OpenSSL `enc -pbkdf2` compatible — do not change the KDF/cipher without also rotating the vault backend."
+      - "packages/core/src/keypoollive/keypool.ts must stay dependency-free of packages/core/src/plugin/boot.ts's Plugin service union — it is intentionally plain functions (all operations are synchronous), not an Effect Context.Service, precisely to avoid having to wire a new service through boot.ts for a purely internal rotation cache."
+      - "Both keypoollive.ts files must keep re-resolving a key and rewriting the provider-specific auth header on every real HTTP call inside their custom `fetch` — this is the only mechanism providing per-request rotation, because both aisdk.ts (v2) AND provider.ts's resolveSDK (v1, via its own {providerID,npm,options}-keyed `s.sdk` cache) memoize the built SDK client forever per model."
+      - "packages/opencode/src/plugin/keypoollive.ts must keep tagging each model's requests with the x-keypoollive-vault-provider header and stripping it before forwarding — it's the only way the one shared provider-level dispatch fetch knows which vault sub-provider (and therefore which keys/protocol/auth style) a given request belongs to."
+      - "If provider.ts (v1) ever migrates to read Catalog.Service directly, re-validate whether the v2 keypoollive.ts registration becomes redundant with the v1 one (do not just delete either without re-checking which one is live at that point)."
+    tests:
+      - "bun run test:invariants"
+      - "pushd packages/core && bun test keypoollive ; popd"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. KeypoolLive server routes (rotation + usage dashboard)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-server-routes
+    description: >
+      Exposes `POST /keypoollive/rotate` ({vaultProviderName} -> {rotated}), `GET
+      /keypoollive/usage` ({period?} -> {storageMode, stats}), `GET /keypoollive/errors` (->
+      {storageMode, stats}), and `POST /keypoollive/purge` (-> {freedBytes}). Follows the
+      existing Kilo-owned HttpApi group pattern under
+      packages/opencode/src/kilocode/server/httpapi/{groups,handlers}/ (an exempt path — no
+      kilocode_change markers needed inside it), registered into the shared
+      packages/opencode/src/server/routes/instance/httpapi/api.ts (InstanceHttpApi) and
+      packages/opencode/src/kilocode/server/httpapi/server.ts (exempt) — mirrors
+      instance-reload.ts/branch-name.ts almost exactly, see those for the template.
+
+      Deliberately does NOT expose a "list vault models" route: vault models already appear
+      through the generic `GET /provider` endpoint
+      (packages/opencode/src/server/routes/instance/httpapi/groups/provider.ts) once
+      keypoollive-provider's config() hook registers them — no bespoke listing needed.
+
+      `vaultProviderName` is the vault's own provider name (e.g. "openai"), not the kilocode
+      combined model id — there is no per-session key assignment (packages/opencode/src/session/llm.ts
+      calls `provider.getLanguage(model)` with no sessionID reaching key selection, and
+      provider.ts's SDK cache is keyed by {providerID, npm, options} with no session dimension
+      either), so rotation advances the shared round-robin position for that vault provider
+      globally, not "this session's key" — same accepted approximation as the usage-tracking
+      key attribution in keypoollive-usage-tracking below.
+    paths:
+      - "packages/opencode/src/kilocode/server/httpapi/groups/keypoollive.ts"
+      - "packages/opencode/src/kilocode/server/httpapi/handlers/keypoollive.ts"
+    related_files:
+      - "packages/opencode/src/server/routes/instance/httpapi/api.ts"
+      - "packages/opencode/src/kilocode/server/httpapi/server.ts"
+      - "packages/sdk/js/src/v2/gen/sdk.gen.ts"
+      - "packages/sdk/js/src/v2/gen/types.gen.ts"
+      - "script/generate.ts"
+    invariants:
+      - "KeypoolLiveApi must stay imported and added to InstanceHttpApi in packages/opencode/src/server/routes/instance/httpapi/api.ts, with kilocode_change markers (shared file)."
+      - "keypoolLiveHandlers must stay imported and listed in the `provide` array in packages/opencode/src/kilocode/server/httpapi/server.ts (exempt path, no markers needed there)."
+      - "After any change to the keypoollive HttpApi group's schema, `bun run script/generate.ts` (from repo root) must be re-run and its output (packages/sdk/js/src/v2/gen/{sdk.gen.ts,types.gen.ts}) committed — NOTE: this schema generates into packages/sdk/js/src/v2/gen/, NOT packages/sdk/js/src/gen/ (a separate, older REST API surface from @opencode-ai/server/api that this fork does not touch); do not confuse the two when checking whether the regen actually picked up a route change."
+      - "The rotate endpoint must keep accepting a vault provider name, not a kilocode model id — the webview button is responsible for splitting the combined model id on the first '/'."
+      - "All four endpoints must stay wired through packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts (webview cannot call the CLI server directly — see keypoollive-webview-ui)."
+    tests:
+      - "bun run test:invariants"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. KeypoolLive usage tracking (tokens, key attribution, storage)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-usage-tracking
+    description: >
+      Records per-request token usage (and errors) for the usage dashboard.
+      packages/core/src/keypoollive/usage-db.ts is a straight port of the cline fork's
+      KeypoolUsageDb.ts (local NDJSON, or remote via KEYPOOL_LIVE_REMOTE_STORAGE_URL /
+      KEYPOOL_LIVE_SECRET — same wire contract: POST/GET /v1/keypool/{usage,error,stats,errors,size,purge}
+      against the same ai-proxy-cloudflare Worker, so both forks' usage history is shared).
+
+      Token counts are only available after the AI SDK finishes parsing a response, streaming
+      or not — the dispatch `fetch` in packages/opencode/src/plugin/keypoollive.ts intercepts
+      *before* that point, so it cannot extract them (confirmed by tracing how the cline fork
+      does this: always after `stream.usage`/the `"finish"` part, never by parsing SSE
+      manually). The integration point is a `keypoollive` entry added to `kiloCustomLoaders()`
+      in packages/opencode/src/kilocode/provider/provider.ts (an exempt, Kilo-owned file — no
+      markers needed), which wraps the `LanguageModelV3` with `wrapLanguageModel()`'s
+      `wrapGenerate`/`wrapStream` middleware (the SAME utility packages/opencode/src/session/llm.ts
+      already uses for `transformParams` — not a new mechanism) to read `result.usage` /
+      the stream's `"finish"` part after completion, for both streaming and non-streaming calls.
+
+      Key identity (which vault key was used) is NOT available inside the wrapLanguageModel
+      middleware — it only knows `modelID`/`options`, not which of possibly several keys the
+      dispatch fetch picked for this specific call. Bridged via
+      `getLastSelectedKeyInfo(vaultProviderName)`, exported from
+      packages/opencode/src/plugin/keypoollive.ts: the dispatch fetch records the key it just
+      selected into a small module-level map keyed by vault provider name, read back by the
+      custom loader right after doGenerate/doStream resolves. This is deliberately best-effort,
+      not exact: two concurrent requests to the SAME vault sub-provider (e.g. two sessions both
+      using "openai") can race and misattribute usage to the wrong key — acceptable for a usage
+      dashboard, same category of accepted approximation as rotation being global rather than
+      per-session (keypoollive-server-routes).
+
+      Each keypoollive model's config entry also carries `options: {vaultProviderName}`
+      (packages/opencode/src/plugin/keypoollive.ts) so the custom loader can identify which
+      vault sub-provider a given `modelID` (the wire id, e.g. "gpt-4o" — NOT the combined
+      catalog id) belongs to.
+    paths:
+      - "packages/core/src/keypoollive/usage-db.ts"
+    related_files:
+      - "packages/opencode/src/kilocode/provider/provider.ts"
+      - "packages/opencode/src/plugin/keypoollive.ts"
+      - "packages/opencode/src/session/llm.ts"
+      - "packages/opencode/src/provider/provider.ts"
+    invariants:
+      - "The `keypoollive` entry in kiloCustomLoaders() must keep using wrapLanguageModel's wrapGenerate/wrapStream — not a raw fetch wrapper — to have access to normalized `usage` regardless of streaming."
+      - "Each keypoollive model config entry must keep `options: {vaultProviderName}` so the custom loader can identify the vault sub-provider from the wire modelID alone."
+      - "getLastSelectedKeyInfo/lastSelectedKey in packages/opencode/src/plugin/keypoollive.ts must stay exported/importable by packages/opencode/src/kilocode/provider/provider.ts — this is the only bridge between key selection (fetch) and usage recording (custom loader)."
+      - "usage-db.ts must keep reading/writing the same remote wire contract as the cline fork's KeypoolUsageDb.ts (/v1/keypool/{usage,error,stats,errors,size,purge}) — both forks share the same ai-proxy-cloudflare backend and usage history."
+      - "getDbDir() must never accept an http(s) KEYPOOL_USAGE_DB_DIR as a filesystem path — a real user hit this exact misconfiguration; it must fall back to the default XDG data dir with a warning instead of silently writing to a bogus nested path."
+      - "getEffectiveRemoteConfig() must keep accepting an http(s) KEYPOOL_USAGE_DB_DIR as a remote-storage URL fallback when KEYPOOL_LIVE_REMOTE_STORAGE_URL isn't set — same real misconfiguration, this makes it recover into remote mode instead of silently degrading to local."
+      - "recordKeypoolliveUsage/recordKeypoolliveError in provider.ts must use combinedModelId(), not raw string concatenation, to avoid a double-prefixed modelId for protocols (e.g. poolside) whose wire model id already starts with the vault provider name."
+    tests:
+      - "bun run test:invariants"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. KeypoolLive webview UI (rotate button, Aggressive Rotation toggle, dashboard)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-webview-ui
+    description: >
+      Adds, entirely inside packages/kilo-vscode/ (100% Kilo additions — kilocode_change is
+      FORBIDDEN here, checked by `bun run check-kilocode-change`):
+        - A manual rotation button + usage-dashboard button in
+          webview-ui/src/components/chat/PromptInput.tsx, shown via
+          `<Show when={selectedModel()?.providerID === "keypoollive"}>` next to
+          ModelSelector/ThinkingSelector.
+        - webview-ui/src/components/chat/KeypoolLiveDashboard.tsx: a Dialog with usage/errors
+          tabs, a period selector, and a purge action, backed by the keypoollive-server-routes
+          endpoints.
+        - An "Aggressive Rotation" toggle in webview-ui/src/components/settings/ProvidersTab.tsx,
+          in the connected-provider row for `keypoollive`, reading/writing
+          `config().provider.keypoollive.options.aggressiveRotation` via the existing generic
+          `updateConfig()` (no schema migration needed — provider options are an untyped bag).
+
+      The webview CANNOT call the CLI server (`kilo serve`) directly — its port/password are
+      never sent to the webview, and routes need a `directory` resolved server-side. Every
+      action here goes: webview `vscode.postMessage(...)` -> extension host -> SDK client call
+      -> `vscode.postMessage(...)` back. New message types added in
+      webview-ui/src/types/messages/{webview-messages,extension-messages}.ts; the extension-host
+      side lives in packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts, called from
+      packages/kilo-vscode/src/kilo-provider/early-message.ts's `routeEarlyMessage`.
+
+      GOTCHA that cost real debugging time: packages/kilo-vscode/src/KiloProvider.ts's main
+      webview-message dispatch (a giant switch in its `onDidReceiveMessage` handler) is at a
+      FROZEN ESLint `complexity` cap of 150 (packages/kilo-vscode/eslint.config.mjs, comment:
+      "Existing complexity violations are capped at their current max... Do not raise
+      complexity caps; refactor instead") and was already exactly at 150 before this fork —
+      adding even one new `case` there fails lint. `routeEarlyMessage` (already handling
+      `copyToClipboard` etc. the same way) is the established escape hatch, with its OWN much
+      lower complexity budget (20, the file's default, no override) — which is ALSO why the
+      keypoollive-specific routing was further extracted into
+      handlers/keypoollive.ts's `routeKeypoolLiveMessage()` rather than inlined directly in
+      `routeEarlyMessage` (4 message types' worth of branching would have blown ITS budget too).
+      Any future addition to either dispatcher should check its remaining complexity budget
+      first, not just add a case/if and see if it fails.
+
+      Confirmed NOT needed: a bespoke model selector in the chat input. Traced
+      webview-ui/src/components/shared/ModelSelector.tsx's actual filter
+      (`m.providerID === KILO_GATEWAY_ID || connected().includes(m.providerID)`) and confirmed
+      via a real `GET /provider` call that `keypoollive` is in `connected` — its models already
+      show up in the standard picker.
+    paths:
+      - "packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboard.tsx"
+      - "packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts"
+    related_files:
+      - "packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx"
+      - "packages/kilo-vscode/webview-ui/src/components/settings/ProvidersTab.tsx"
+      - "packages/kilo-vscode/webview-ui/src/types/messages/webview-messages.ts"
+      - "packages/kilo-vscode/webview-ui/src/types/messages/extension-messages.ts"
+      - "packages/kilo-vscode/src/kilo-provider/early-message.ts"
+      - "packages/kilo-vscode/src/KiloProvider.ts"
+      - "packages/kilo-vscode/webview-ui/src/i18n/en.ts"
+      - "packages/kilo-vscode/eslint.config.mjs"
+    invariants:
+      - "No file under packages/kilo-vscode/ or packages/kilo-ui/ may contain the string `kilocode_change` — checked by `bun run check-kilocode-change` (from packages/kilo-vscode/)."
+      - "New webview<->host message types must be added to BOTH webview-messages.ts (or extension-messages.ts) AND their respective union type (WebviewMessage / ExtensionMessage), or the message is silently dropped/untyped."
+      - "keypoollive-specific webview<->host routing must stay out of packages/kilo-vscode/src/KiloProvider.ts's main dispatch switch (frozen complexity cap, see description) — route it through early-message.ts / handlers/keypoollive.ts instead."
+      - "The rotate/dashboard buttons must stay gated on `selectedModel()?.providerID === \"keypoollive\"` — they are meaningless for any other provider."
+    tests:
+      - "bun run test:invariants"
+      - "pushd packages/kilo-vscode && bun run check-types && bun run lint && bun run check-kilocode-change && bun run knip ; popd"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 5. KeypoolLive preview release workflow (renamed extension + CLI identity)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-release-workflow
+    description: >
+      .github/workflows/keypool-live-preview.yml builds a VSIX and CLI binaries/npm package
+      on every push to keypool-live, renamed away from the real kilocode identity so both can
+      be installed side by side without ID collisions:
+        - VS Code extension: kilocode.kilo-code -> sctg.keypool-code (packages/kilo-vscode/package.json
+          patched at CI time — name/publisher/displayName/repository/homepage/author — never committed).
+        - CLI npm package: @kilocode/cli -> @sctg/keypool-code-cli (packages/opencode/package.json's
+          `name` patched at CI time; packages/opencode/script/build.ts derives every per-arch dist
+          folder name from that field dynamically, so this one patch is enough to rename the whole
+          build — no other part of build.ts hardcodes the old name).
+
+      GOTCHA found while designing this workflow: packages/opencode/bin/kilo (the npm-published CLI
+      wrapper script) hardcodes the platform sub-package name it resolves at runtime
+      (`"@kilocode/cli-" + platform + "-" + arch`) as a literal string — completely independent of
+      package.json. Renaming only package.json without also sed-patching this exact string produces
+      a package that installs fine but crashes on first run trying to require() a platform package
+      that was never renamed to match. The workflow patches both together, always in the same step.
+
+      packages/kilo-vscode/script/build.ts also hardcodes the per-target CLI dist directory names it
+      expects ("@kilocode/cli-<target>") — rather than patching that shared, committed script too,
+      the workflow builds the CLI ONCE under the renamed identity, then aliases the renamed dist dirs
+      back to the original expected names via symlinks before invoking the unmodified build script.
+
+      Deliberately reuses the real packages/opencode/script/{build,publish}.ts and
+      packages/kilo-vscode/script/build.ts unmodified (never forked/duplicated) — they're complex
+      (bwrap sandbox staging, tree-sitter wasm bundling, kilo-console build, multi-target native
+      compiles) and safe to reuse as-is because every rename flows through package.json fields they
+      already read dynamically. packages/opencode/script/publish.ts's `!Script.preview` guard (which
+      this workflow relies on to skip Docker/AUR/Homebrew publishing) is upstream's own, not
+      fork-added — do not assume it will always exist; re-verify after any upstream sync that
+      touches that file. The npm publish job does NOT use `packages/kilo-vscode/script/publish.ts`
+      (that one calls `vsce publish`/`ovsx publish` to the real public VS Code Marketplace/Open VSX —
+      this fork only packages VSIX files as downloadable GitHub pre-release assets, same as the cline
+      fork's equivalent workflow, never touching the real marketplace).
+    paths:
+      - ".github/workflows/keypool-live-preview.yml"
+    related_files:
+      - "script/check-workflows.ts"
+      - "packages/opencode/package.json"
+      - "packages/opencode/bin/kilo"
+      - "packages/opencode/script/build.ts"
+      - "packages/opencode/script/publish.ts"
+      - "packages/kilo-vscode/package.json"
+      - "packages/kilo-vscode/script/build.ts"
+      - "packages/script/src/index.ts"
+    invariants:
+      - "keypool-live-preview.yml must be listed in script/check-workflows.ts's `active` set, or CI fails as unexpected drift."
+      - "The CLI rename step must patch BOTH packages/opencode/package.json's `.name` AND packages/opencode/bin/kilo's hardcoded '@kilocode/cli-' string — renaming only one produces a package that installs but cannot run (see GOTCHA above)."
+      - "The VSIX rename step must patch packages/kilo-vscode/package.json's `.name` and `.publisher` to `keypool-code`/`sctg` (both — the user-facing extension id is publisher.name together), never just one."
+      - "None of these renames may be committed to packages/opencode/package.json, packages/opencode/bin/kilo, or packages/kilo-vscode/package.json in the repo — they must stay CI-time-only patches (jq/sed) on an ephemeral checkout, so the real branch files keep matching upstream kilocode for backport purposes."
+      - "The workflow must keep gating on `github.repository == 'TEA-ching/kilocode'` (this fork), mirroring the `Kilo-Org/kilocode` gate used by every real kilocode release workflow, so it never accidentally runs on someone's own fork-of-a-fork."
+    tests:
+      - "bun run test:invariants"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 6. kilocode-download (Rust download/update tool)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: kilocode-download
+    description: >
+      packages/kilocode-download is a from-scratch Rust crate, forked from the cline fork's
+      apps/clinepool-download and adapted to kilocode's own release asset shapes. Given
+      `--vsix`, downloads a single VSIX file from the latest (or a specific) `preview/*` GitHub
+      release. Given `--cli`, downloads and EXTRACTS a per-platform archive into a directory
+      (kilocode's CLI ships as a directory — the `kilo`/`kilo.exe` binary plus a bundled bwrap
+      sandbox helper, tree-sitter WASM resources, and a sandbox worker JS file it needs at
+      runtime — unlike cline's CLI, which is a single self-contained executable, so this tool
+      cannot just write raw bytes to one file the way clinepool-download does).
+
+      Shares ONE Platform enum (8 variants: darwin/linux/alpine × x64/arm64, win32 × x64/arm64)
+      between --cli and --vsix, matching packages/kilo-vscode/script/build.ts's own VSIX target
+      list exactly — no linux-armhf (kilocode doesn't build that target, unlike cline). This
+      only works because .github/workflows/keypool-live-preview.yml's release job translates
+      opencode's own build vocabulary ("windows-x64", "linux-x64-musl", etc.) into this same
+      vocabulary ("win32-x64", "alpine-x64") when naming the CLI release archives — see that
+      job's "Unpack CLI dist and package raw binaries for the release" step. If that translation
+      is ever removed, kilocode-download's asset name matching for --cli breaks silently (assets
+      just won't be found, not a crash).
+
+      find_latest_release()'s "tag contains 'preview'" + "newest published_at wins" logic is a
+      straight, unmodified port of the cline fork's github.rs — both forks tag their preview
+      releases the same way (`preview/<datetime>`), so the logic needed zero changes.
+    paths:
+      - "packages/kilocode-download/**"
+    related_files:
+      - ".github/workflows/keypool-live-preview.yml"
+      - "packages/kilo-vscode/script/build.ts"
+    invariants:
+      - "Platform::from_str must keep returning None for 'linux-armhf' — kilocode-download intentionally does not support it (kilocode has no linux-armhf VSIX/CLI target, unlike cline's clinepool-download)."
+      - "The 8 Platform variants must stay exactly in sync with packages/kilo-vscode/script/build.ts's VSIX target list — adding/removing a kilocode-vscode build target without updating this enum silently breaks --arch validation for that platform."
+      - "extract_archive() must dispatch on the .zip vs .tar.gz suffix of the asset filename, not on the target Platform — the CLI archive format is an artifact of the OS packaging it (zip on Windows, tar.gz elsewhere), not of the platform enum itself."
+      - "--cli must extract into a directory (--out-dir), never write a single file the way --vsix's --out-file does — the CLI's sibling files (bwrap, tree-sitter wasm, sandbox worker js) are required at runtime, not optional."
+      - "kilocode-download must never be added to the bun workspaces glob (packages/*) with its own package.json — like cline's apps/clinepool-download, it's a Cargo-only crate bun's workspace resolution silently skips when there's no package.json to read; adding one would pull it into bun install/typecheck/lint for no reason."
+    tests:
+      - "bun run test:invariants"
+      - "pushd packages/kilocode-download && cargo test ; popd"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 7. Backport-agent infrastructure
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: backport-agent-infra
+    description: >
+      The backport-agent configuration itself (this file, config.json, and the
+      deterministic invariant checker). Kept as its own customization so a future upstream
+      change to unrelated files never gets misattributed to it, and so an agent evaluating
+      "is this safe to auto-apply" always has the full list of what the fork owns.
+    paths:
+      - ".backport-agent/**"
+      - ".claude/skills/backport-sync/**"
+      - ".claude/skills/check-invariants/**"
+    related_files: []
+    invariants:
+      - "check-fork-invariants.sh must stay the first command in every validation tier of config.json."
+      - "Every `paths` entry declared across this file should have at least one corresponding check-fork-invariants.sh check once the corresponding feature phase lands (tracked incrementally — covers all 6 phases now: keypoollive-provider, keypoollive-server-routes, keypoollive-usage-tracking, keypoollive-webview-ui, keypoollive-release-workflow, and kilocode-download)."
+    tests:
+      - "bun run test:invariants"

@@ -882,6 +882,66 @@ export interface SandboxDefaultStatusMessage {
   requestID?: string
 }
 
+export interface KeypoolLiveRotatedMessage {
+  type: "keypoolLiveRotated"
+  requestID: string
+  vaultProviderName: string
+}
+
+export interface KeypoolLiveRotateErrorMessage {
+  type: "keypoolLiveRotateError"
+  requestID: string
+  vaultProviderName: string
+  error: string
+}
+
+export interface KeypoolLiveUsageStatMessage {
+  period: string
+  provider: string
+  modelId: string
+  keyOwner: string
+  keyHint: string
+  promptTokens: number
+  completionTokens: number
+  requestCount: number
+}
+
+export interface KeypoolLiveErrorStatMessage {
+  provider: string
+  keyOwner: string
+  keyHint: string
+  totalRequests: number
+  errorCount: number
+  errorRate: number
+  lastErrorCode: number | null
+}
+
+export interface KeypoolLiveUsageMessage {
+  type: "keypoolLiveUsage"
+  requestID: string
+  storageMode: "local" | "remote"
+  stats: KeypoolLiveUsageStatMessage[]
+}
+
+export interface KeypoolLiveErrorsMessage {
+  type: "keypoolLiveErrors"
+  requestID: string
+  storageMode: "local" | "remote"
+  stats: KeypoolLiveErrorStatMessage[]
+}
+
+export interface KeypoolLivePurgedMessage {
+  type: "keypoolLivePurged"
+  requestID: string
+  freedBytes: number
+}
+
+export interface KeypoolLiveDashboardErrorMessage {
+  type: "keypoolLiveDashboardError"
+  requestID: string
+  error: string
+}
+
 export interface SandboxStatusErrorMessage {
   type: "sandboxStatusError"
   sessionID: string
@@ -1356,6 +1416,12 @@ export type ExtensionMessage =
   | AutoApproveStateMessage
   | SandboxStatusMessage
   | SandboxDefaultStatusMessage
+  | KeypoolLiveRotatedMessage
+  | KeypoolLiveRotateErrorMessage
+  | KeypoolLiveUsageMessage
+  | KeypoolLiveErrorsMessage
+  | KeypoolLivePurgedMessage
+  | KeypoolLiveDashboardErrorMessage
   | SandboxStatusErrorMessage
   | AgentManagerMultiVersionProgressMessage
   | AgentManagerSetSessionModelMessage

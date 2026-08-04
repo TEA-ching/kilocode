@@ -5,8 +5,10 @@ import { useDialog } from "@kilocode/kilo-ui/context/dialog"
 import { Icon } from "@kilocode/kilo-ui/icon"
 import { ProviderIcon } from "@kilocode/kilo-ui/provider-icon"
 import { Select } from "@kilocode/kilo-ui/select"
+import { Switch } from "@kilocode/kilo-ui/switch"
 import { Tag } from "@kilocode/kilo-ui/tag"
 import { showToast } from "@kilocode/kilo-ui/toast"
+import { Tooltip } from "@kilocode/kilo-ui/tooltip"
 import { Component, For, Show, createMemo, createSignal, onCleanup } from "solid-js"
 import { useConfig } from "../../context/config"
 import { useLanguage } from "../../context/language"
@@ -154,6 +156,22 @@ const ProvidersTab: Component = () => {
     dialog.show(() => <ProviderConnectDialog providerID={item.id} oauthOnly />)
   }
 
+  function keypoolLiveAggressiveRotation() {
+    return config().provider?.["keypoollive"]?.options?.["aggressiveRotation"] === true
+  }
+
+  function setKeypoolLiveAggressiveRotation(checked: boolean) {
+    const existing = config().provider?.["keypoollive"]
+    updateConfig({
+      provider: {
+        keypoollive: {
+          ...existing,
+          options: { ...existing?.options, aggressiveRotation: checked },
+        },
+      },
+    })
+  }
+
   function chatgpt(item: Provider) {
     if (item.id !== "openai") return false
     if (source(item) === "custom") return false
@@ -248,6 +266,31 @@ const ProvidersTab: Component = () => {
                   <Tag>{sourceTag(item)}</Tag>
                 </div>
                 <div style={{ display: "flex", "align-items": "center", gap: "4px" }}>
+                  <Show when={item.id === "keypoollive"}>
+                    <Tooltip
+                      value={language.t("settings.providers.keypoollive.aggressiveRotation.description")}
+                      placement="top"
+                      openDelay={0}
+                    >
+                      <span style={{ display: "flex", "align-items": "center", gap: "8px" }}>
+                        <span
+                          style={{
+                            "font-size": "var(--kilo-font-size-12)",
+                            color: "var(--text-weak-base, var(--vscode-descriptionForeground))",
+                          }}
+                        >
+                          {language.t("settings.providers.keypoollive.aggressiveRotation.title")}
+                        </span>
+                        <Switch
+                          checked={keypoolLiveAggressiveRotation()}
+                          onChange={setKeypoolLiveAggressiveRotation}
+                          hideLabel
+                        >
+                          {language.t("settings.providers.keypoollive.aggressiveRotation.title")}
+                        </Switch>
+                      </span>
+                    </Tooltip>
+                  </Show>
                   <Show when={!canDisconnect(item)}>
                     <span
                       style={{

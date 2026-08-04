@@ -161,6 +161,14 @@ import type {
   InteractiveTerminalWriteErrors,
   InteractiveTerminalWriteInput,
   InteractiveTerminalWriteResponses,
+  KeypoolliveErrorsErrors,
+  KeypoolliveErrorsResponses,
+  KeypoollivePurgeErrors,
+  KeypoollivePurgeResponses,
+  KeypoolliveRotateErrors,
+  KeypoolliveRotateResponses,
+  KeypoolliveUsageErrors,
+  KeypoolliveUsageResponses,
   KiloAudioTranscriptionsErrors,
   KiloAudioTranscriptionsResponses,
   KiloAuthStatusErrors,
@@ -6771,6 +6779,137 @@ export class InteractiveTerminal extends HeyApiClient {
   }
 }
 
+export class Keypoollive extends HeyApiClient {
+  /**
+   * Rotate KeypoolLive key
+   *
+   * Manually advance the round-robin key position for a KeypoolLive vault provider, so the next request from any session uses a different key.
+   */
+  public rotate<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vaultProviderName?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "vaultProviderName" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<KeypoolliveRotateResponses, KeypoolliveRotateErrors, ThrowOnError>({
+      url: "/keypoollive/rotate",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Get KeypoolLive usage stats
+   *
+   * Token usage per key/provider/model, bucketed by the requested rolling period.
+   */
+  public usage<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      period?: "hour" | "day" | "week" | "month"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "period" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<KeypoolliveUsageResponses, KeypoolliveUsageErrors, ThrowOnError>({
+      url: "/keypoollive/usage",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get KeypoolLive error stats
+   *
+   * Error counts and rates per key/provider, over the full retained history.
+   */
+  public errors<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<KeypoolliveErrorsResponses, KeypoolliveErrorsErrors, ThrowOnError>({
+      url: "/keypoollive/errors",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Purge KeypoolLive usage/error stats
+   *
+   * Deletes all stored usage and error records (local files, or remote worker data).
+   */
+  public purge<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<KeypoollivePurgeResponses, KeypoollivePurgeErrors, ThrowOnError>({
+      url: "/keypoollive/purge",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Audio extends HeyApiClient {
   /**
    * Speech to text transcription
@@ -10977,6 +11116,11 @@ export class KiloClient extends HeyApiClient {
   private _interactiveTerminal?: InteractiveTerminal
   get interactiveTerminal(): InteractiveTerminal {
     return (this._interactiveTerminal ??= new InteractiveTerminal({ client: this.client }))
+  }
+
+  private _keypoollive?: Keypoollive
+  get keypoollive(): Keypoollive {
+    return (this._keypoollive ??= new Keypoollive({ client: this.client }))
   }
 
   private _kilo?: Kilo

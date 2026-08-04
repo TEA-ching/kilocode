@@ -1,0 +1,90 @@
+{
+    "command": "bunx @sctg/backport-agent@latest --verbose --config .backport-agent/config.json --backport-customizations .backport-agent/customizations.yaml --keypool-vault-url $KEYPOOL_VAULT_URL --keypool-live-secret $KEYPOOL_LIVE_SECRET 2>&1 | tee .backport-agent/logs/output_$(date +%Y%m%d_%H%M%S)_backport-agent.log",
+    "report": {
+        "destination": ".backport-agent"
+    },
+    "auth": {
+        "sshKeyPath": "~/.ssh/id_ed25519_aeltorio"
+    },
+    "upstream": {
+        "url": "https://github.com/Kilo-Org/kilocode.git",
+        "repo": "Kilo-Org/kilocode",
+        "branch": "main",
+        "remote": "upstream"
+    },
+    "fork": {
+        "url": "git@github.com:TEA-ching/kilocode.git",
+        "repo": "TEA-ching/kilocode",
+        "branch": "keypool-live",
+        "remote": "origin"
+    },
+    "workingDir": "../tea-ching-kilocode",
+    "sync": {
+        "maxCommitsPerRun": 8,
+        "_comment_maxCommitsPerRun": "Starting value carried over from the cline fork's tuning (evolutions.md): 10 commits/run risked exhausting the orchestrator's context window on a busy day; 8 is the compromise that still keeps a daily cadence realistic.",
+        "initialFetchDepth": 200,
+        "maxFetchDepth": 2000,
+        "batchSize": 3,
+        "maxIterations": 250,
+        "dryRun": false,
+        "createPullRequest": true,
+        "_comment_createPullRequest": "generate_report creates/updates a draft PR from the sync branch to keypool-live deterministically (backport-agent >= 0.8.0). Requires GITHUB_TOKEN (falls back to `gh auth token` since 0.8.2).",
+        "branchPrefix": "sync/upstream-",
+        "prNumberMatching": {
+            "enabled": true,
+            "minSubjectSimilarity": 0.4
+        }
+    },
+    "models": {
+        "provider": "keypoollive",
+        "apiKey": "auto",
+        "fast": "mistral/mistral-code-agent-latest",
+        "_comment_fast": "Orchestrator for the tool loop. Carried over from the cline fork's tuning — generous free tier, reliable in practice.",
+        "specialist": "mistral/devstral-latest",
+        "_comment_specialist": "Conflict resolution (first attempt).",
+        "powerful": "cohere/command-a-reasoning-08-2025",
+        "_comment_powerful": "Resolution fallback + consensus second opinion. Different vendor from the specialist (mistral) so cross-vendor consensus actually catches doubtful resolutions. Free tier for the user.",
+        "summarizer": "gemini/gemini-3-flash-preview",
+        "_comment_summarizer": "Context compaction."
+    },
+    "ai": {
+        "_comment": "AI guardrails. minAutoApplyConfidence is enforced in code (host gate in apply_resolved_file), not just in the prompt.",
+        "minAutoApplyConfidence": "medium",
+        "requireReviewOnSemanticRisk": true,
+        "enableConflictConsensus": true,
+        "_comment_enableConflictConsensus": "A second independent resolution (models.powerful, a different vendor from models.specialist) is compared against the first; divergence => confidence low => blocked by the host gate.",
+        "conflictConsensusThreshold": 0.7,
+        "enrichCustomizationContext": true
+    },
+    "resolve": {
+        "ours": [],
+        "theirs": []
+    },
+    "validation": {
+        "_comment": "test:invariants (deterministic invariant checks, <1s) is in every suite. See .backport-agent/check-fork-invariants.sh.",
+        "low": ["bun install && bun run test:invariants", "bun turbo typecheck"],
+        "medium": [
+            "bun install && bun run test:invariants",
+            "bun turbo typecheck",
+            "pushd packages/core && bun test ; popd"
+        ],
+        "high": [
+            "bun install && bun run test:invariants",
+            "bun turbo typecheck",
+            "pushd packages/core && bun test ; popd",
+            "pushd packages/opencode && bun run typecheck && bun test ; popd",
+            "pushd packages/kilo-vscode && bun run typecheck && bun run lint ; popd"
+        ],
+        "final": [
+            "bun install",
+            "bun run test:invariants",
+            "bun turbo typecheck",
+            "pushd packages/core && bun test ; popd",
+            "pushd packages/opencode && bun run typecheck && bun test ; popd",
+            "pushd packages/kilo-vscode && bun run typecheck && bun run lint && bun run test:unit ; popd",
+            "pushd packages/kilo-vscode && bun run check-kilocode-change ; popd",
+            "bun run script/check-opencode-annotations.ts",
+            "bun run script/check-workflows.ts"
+        ]
+    }
+}
