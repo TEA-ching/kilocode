@@ -155,6 +155,8 @@ fi
 # ── 9. Backport-agent infra ─────────────────────────────────────────────────
 check_file "customizations manifest" .backport-agent/customizations.yaml
 check_file "backport-agent config"   .backport-agent/config.json
+check_file "CLAUDE.md (fork-specific Claude Code context)" CLAUDE.md
+check_grep "CLAUDE.md imports AGENTS.md instead of duplicating it" '@AGENTS.md' CLAUDE.md
 
 echo "===================================="
 echo "Invariant checks: $PASS_COUNT passed, $FAIL_COUNT failed"

@@ -408,16 +408,28 @@ customizations:
   - id: backport-agent-infra
     description: >
       The backport-agent configuration itself (this file, config.json, and the
-      deterministic invariant checker). Kept as its own customization so a future upstream
+      deterministic invariant checker), plus CLAUDE.md — the fork's auto-loaded project
+      context for Claude Code (imports AGENTS.md, then adds keypool-live-specific context:
+      the two-provider-system gotcha, a file map, the sharpest non-obvious traps, and pointers
+      to this file/the two skills). Kept as its own customization so a future upstream
       change to unrelated files never gets misattributed to it, and so an agent evaluating
       "is this safe to auto-apply" always has the full list of what the fork owns.
+
+      GOTCHA to watch for on future backport syncs: upstream Kilo-Org/kilocode does not have a
+      CLAUDE.md today, but if it ever adds one, a naive merge could silently clobber this fork's
+      version (which imports AGENTS.md via `@AGENTS.md` and must keep doing so). Treat any
+      upstream CLAUDE.md addition as a conflict requiring manual reconciliation, not a
+      fast-forwardable file.
     paths:
       - ".backport-agent/**"
       - ".claude/skills/backport-sync/**"
       - ".claude/skills/check-invariants/**"
-    related_files: []
+      - "CLAUDE.md"
+    related_files:
+      - "AGENTS.md"
     invariants:
       - "check-fork-invariants.sh must stay the first command in every validation tier of config.json."
       - "Every `paths` entry declared across this file should have at least one corresponding check-fork-invariants.sh check once the corresponding feature phase lands (tracked incrementally — covers all 6 phases now: keypoollive-provider, keypoollive-server-routes, keypoollive-usage-tracking, keypoollive-webview-ui, keypoollive-release-workflow, and kilocode-download)."
+      - "CLAUDE.md must keep importing AGENTS.md (`@AGENTS.md` as its first line) rather than duplicating its build/test/lint content — AGENTS.md is upstream-owned and kept current by backport syncs; copying its content into CLAUDE.md would drift out of date silently."
     tests:
       - "bun run test:invariants"
