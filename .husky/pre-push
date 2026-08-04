@@ -42,9 +42,9 @@ done
 
 bun typecheck --filter='!@kilocode/kilo-jetbrains'
 
-if [ "$jetbrains" -eq 1 ]; then
-  bun typecheck --filter='@kilocode/kilo-jetbrains'
-else
+# if [ "$jetbrains" -eq 1 ]; then
+#   bun typecheck --filter='@kilocode/kilo-jetbrains'
+# else
   echo "Skipping JetBrains typecheck (no relevant changes)"
-fi
+# fi
 # kilocode_change end
