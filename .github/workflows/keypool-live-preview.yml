@@ -67,7 +67,7 @@ jobs:
   build-cli:
     name: Build CLI binaries (renamed for SCTG)
     needs: setup
-    runs-on: ubuntu-2404
+    runs-on: ubuntu-24.04
     if: github.repository == 'TEA-ching/kilocode'
     steps:
       - uses: actions/checkout@v6
@@ -127,7 +127,7 @@ jobs:
   build-vscode:
     name: Build VSIX (renamed for SCTG)
     needs: build-cli
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     if: github.repository == 'TEA-ching/kilocode'
     steps:
       - uses: actions/checkout@v6
