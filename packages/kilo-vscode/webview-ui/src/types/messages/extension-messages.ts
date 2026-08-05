@@ -613,6 +613,12 @@ export interface ConfigUpdatedMessage {
   collections?: ConfigCollections
   settings?: ExtensionSettings
   features: FeatureFlags
+  /** Present only when this message is the direct response to a webview updateConfig
+   *  request — echoes that request's saveRequestId. Absent for background pushes (e.g. an
+   *  SSE-triggered refresh from an unrelated config change). Deliberately not named
+   *  `requestId`: that field name is the generic webview request/response correlation
+   *  channel (see AgentManagerTerminalCreatedMessage's `createId` for the same reasoning). */
+  saveRequestId?: string
 }
 
 export interface ConfigUpdateFailedMessage {
@@ -624,6 +630,7 @@ export interface ConfigUpdateFailedMessage {
   globalConfig?: Config
   projectConfig?: Config
   bindings?: { global?: SettingsConfigBinding; project?: SettingsConfigBinding }
+  saveRequestId?: string
 }
 
 export interface ConfigBindingExpiredMessage {

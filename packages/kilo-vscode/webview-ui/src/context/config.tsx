@@ -32,6 +32,14 @@ function has(value: Record<string, unknown>) {
   return Object.keys(value).length > 0
 }
 
+// A "configUpdated" push can arrive while a save is in flight for reasons unrelated to
+// that save (e.g. a permission auto-approval, or a config change from another window).
+// Only treat it as our own save's confirmation when its saveRequestId matches the one
+// we're currently waiting on.
+function isOwnSaveConfirmation(saveRequestId: string | undefined, saving: boolean, inFlightId: string | undefined) {
+  return saving && saveRequestId !== undefined && saveRequestId === inFlightId
+}
+
 export interface SaveError {
   message: string
   details?: string
@@ -108,6 +116,13 @@ export const ConfigProvider: ParentComponent = (props) => {
   // True while a saveConfig() write is in-flight — used to clear draft on success
   // and to guard against stale configLoaded messages overwriting optimistic state.
   const [saving, setSaving] = createSignal(false)
+  // Id of the saveConfig() write currently in flight, echoed back by the extension
+  // on its confirmation. A "configUpdated" push can arrive while saving() is true
+  // for reasons unrelated to our own save (e.g. a permission auto-approval, or a
+  // config change from another window) — without this correlation, such a push
+  // was indistinguishable from our own save's confirmation and would wipe the
+  // still-unsent draft.
+  let savingRequestId: string | undefined
   // Error from the most recent saveConfig() attempt, or null if no error.
   // Cleared when the user edits the draft again or starts a new save.
   const [saveError, setSaveError] = createSignal<SaveError | null>(null)
@@ -150,10 +165,11 @@ export const ConfigProvider: ParentComponent = (props) => {
       return
     }
     if (message.type === "configUpdated") {
-      if (saving()) {
+      if (isOwnSaveConfirmation(message.saveRequestId, saving(), savingRequestId)) {
         // This configUpdated is the confirmation of our saveConfig() write.
         // Clear the draft now that the server has confirmed the write.
         setSaving(false)
+        savingRequestId = undefined
         setDraft({})
         setGlobalDraft({})
         setProjectDraft({})
@@ -203,6 +219,7 @@ export const ConfigProvider: ParentComponent = (props) => {
   const unsubscribeFailure = vscode.onMessage((message: ExtensionMessage) => {
     if (message.type !== "configUpdateFailed") return
     setSaving(false)
+    savingRequestId = undefined
     if (message.completedScopes?.length) {
       const split = splitConfigByScope(draft())
       const remaining = message.completedScopes.includes("global")
@@ -371,6 +388,8 @@ export const ConfigProvider: ParentComponent = (props) => {
     const split = splitConfigByScope(changes)
     const next = deepMerge(split.global as Config, globals)
     const project = deepMerge(split.project as Config, projects)
+    const saveRequestId = crypto.randomUUID()
+    savingRequestId = saveRequestId
     vscode.postMessage({
       type: "updateConfig",
       config: pruneConfigSet(next) as Config,
@@ -379,6 +398,7 @@ export const ConfigProvider: ParentComponent = (props) => {
       projectUnset: configUnsetPaths(project),
       globalBindingId: bindings().global?.id,
       projectBindingId: bindings().project?.id,
+      saveRequestId,
     })
   }
 

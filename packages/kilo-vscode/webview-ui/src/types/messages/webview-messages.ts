@@ -532,6 +532,13 @@ export interface UpdateConfigMessage {
   projectUnset?: string[][]
   globalBindingId?: string
   projectBindingId?: string
+  /** Echoed back on the matching configUpdated/configUpdateFailed so the webview can tell
+   *  its own save's confirmation apart from an unrelated configUpdated push (e.g. a
+   *  permission auto-approval elsewhere) landing while this save is still in flight.
+   *  Named distinctly from the generic `requestId` convention used elsewhere (provider
+   *  connect/OAuth, speech-to-text, etc.), which assumes `requestId` is always a required
+   *  string on any message that has it. */
+  saveRequestId: string
 }
 
 export interface RequestNotificationSettingsMessage {
