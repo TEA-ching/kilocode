@@ -34,6 +34,7 @@ const providers = [
   { value: "bedrock", label: "AWS Bedrock" },
   { value: "openrouter", label: "OpenRouter" },
   { value: "voyage", label: "Voyage" },
+  { value: "keypoollive", label: "KeyPool Live" },
 ] satisfies SelectOption<ProviderValue>[]
 
 const stores = [
@@ -61,6 +62,7 @@ const fields: Record<Provider, Field[]> = {
     { key: "specificProvider", label: "Specific provider", placeholder: "Optional routing provider" },
   ],
   voyage: [{ key: "apiKey", label: "API key", placeholder: "pa-...", secret: true }],
+  keypoollive: [],
 }
 
 function options(input: IndexingConfig, provider: Provider) {
@@ -185,6 +187,19 @@ export function IndexingRoute() {
     update({ [group]: { ...options(draft(), group), [key]: value || undefined } })
   }
 
+  function keypoolLiveModel() {
+    const vaultProviderName = view().keypoollive?.vaultProviderName
+    return vaultProviderName ? `${vaultProviderName}/${view().model ?? ""}` : (view().model ?? "")
+  }
+
+  function setKeypoolLiveModel(value: string) {
+    const trimmed = value.trim()
+    const slash = trimmed.indexOf("/")
+    const vaultProviderName = slash === -1 ? undefined : trimmed.slice(0, slash)
+    const modelId = slash === -1 ? trimmed : trimmed.slice(slash + 1)
+    update({ model: modelId || undefined, keypoollive: { vaultProviderName } })
+  }
+
   function selectProvider(value: ProviderValue) {
     update(providerPatch(value, catalog()?.defaultModel))
   }
@@ -288,7 +303,9 @@ export function IndexingRoute() {
                 description={
                   provider() === "kilo"
                     ? "Select a Kilo-hosted embedding model."
-                    : "Leave empty to use the provider's default embedding model."
+                    : provider() === "keypoollive"
+                      ? "vaultProvider/modelId, e.g. mistral/codestral-embed or cohere/embed-multilingual-v3.0."
+                      : "Leave empty to use the provider's default embedding model."
                 }
                 actions={
                   <SourceBadge
@@ -301,12 +318,24 @@ export function IndexingRoute() {
                 <Show
                   when={provider() === "kilo"}
                   fallback={
-                    <input
-                      value={view().model ?? ""}
-                      placeholder="Provider default"
-                      disabled={Boolean(ctx.saving())}
-                      onInput={(event) => text("model", event.currentTarget.value)}
-                    />
+                    <Show
+                      when={provider() === "keypoollive"}
+                      fallback={
+                        <input
+                          value={view().model ?? ""}
+                          placeholder="Provider default"
+                          disabled={Boolean(ctx.saving())}
+                          onInput={(event) => text("model", event.currentTarget.value)}
+                        />
+                      }
+                    >
+                      <input
+                        value={keypoolLiveModel()}
+                        placeholder="mistral/codestral-embed"
+                        disabled={Boolean(ctx.saving())}
+                        onInput={(event) => setKeypoolLiveModel(event.currentTarget.value)}
+                      />
+                    </Show>
                   }
                 >
                   <CustomSelect
