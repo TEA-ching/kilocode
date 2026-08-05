@@ -50,6 +50,7 @@ Poolside needs neither system — it's already a native models.dev entry.
 | Webview UI (rotate button, dashboard, Aggressive Rotation) | `packages/kilo-vscode/webview-ui/src/components/chat/{PromptInput,KeypoolLiveDashboard}.tsx`, `packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts` |
 | Renamed preview CI (`sctg.keypool-code` / `@sctg/keypool-code-cli`) | `.github/workflows/keypool-live-preview.yml` |
 | Download/update tool | `packages/kilocode-download/` (Rust — no `package.json`, intentionally invisible to bun workspaces) |
+| About-tab "Extension Update" button | `packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts`, `packages/kilo-vscode/src/utils/build-date.ts` + `packages/kilo-vscode/webview-ui/src/config/BuildDate.ts` |
 | Backport agent config | `.backport-agent/{customizations.yaml,config.json,check-fork-invariants.sh}` |
 
 ## Sharpest non-obvious gotchas (full detail in customizations.yaml)
@@ -76,6 +77,15 @@ Poolside needs neither system — it's already a native models.dev entry.
   linux `kilocode-download` Docker build are both best-effort (`continue-on-error`) because they
   need npm trusted publishing / Docker Hub credentials that may not be configured yet on this
   repo — don't treat their failure as a regression without checking that first.
+- **If the About tab shows "unknown" as the extension version in a preview build**, check
+  `KiloProvider.ts`/`MarketplacePanelProvider.ts`'s `extensionVersion` lookup first — it must try
+  `vscode.extensions.getExtension("sctg.keypool-code")` before falling back to
+  `"kilocode.kilo-code"`, since preview builds install under the renamed id.
+- **kilocode's `preview/<datetime>` release tags carry no separate semver** — the "Extension
+  Update" check (`handlers/extension-update.ts`) compares build dates only, against
+  `packages/kilo-vscode/src/utils/build-date.ts`. That file and its webview twin
+  (`webview-ui/src/config/BuildDate.ts`) must always carry the identical literal date, stamped
+  together by one `sed` step in the preview workflow — never edited by hand.
 
 ## Verifying you haven't broken the fork
 
