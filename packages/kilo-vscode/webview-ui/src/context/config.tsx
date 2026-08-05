@@ -211,7 +211,11 @@ export const ConfigProvider: ParentComponent = (props) => {
     if (message.type !== "configBindingExpired") return
     setBindings({})
     if (isDirty()) {
-      setSaveError({ message: "The Settings project changed. Discard or reload before saving." })
+      const text =
+        message.reason === "reconnected"
+          ? "The connection to the CLI backend was reset. Discard or reload before saving."
+          : "The Settings project changed. Discard or reload before saving."
+      setSaveError({ message: text })
       return
     }
     vscode.postMessage({ type: "requestConfig" })

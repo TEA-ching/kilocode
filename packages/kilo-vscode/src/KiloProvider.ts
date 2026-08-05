@@ -324,8 +324,13 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
   private connectionGeneration = 0
   private loginAttempt = 0
   private isWebviewReady = false
+  // Checks the renamed KeyPool Live preview identity first — a preview VSIX built by
+  // .github/workflows/keypool-live-preview.yml ships as "sctg.keypool-code", not
+  // "kilocode.kilo-code", so the hardcoded id alone would report "unknown" in those builds.
   private readonly extensionVersion =
-    vscode.extensions.getExtension("kilocode.kilo-code")?.packageJSON?.version ?? "unknown"
+    vscode.extensions.getExtension("sctg.keypool-code")?.packageJSON?.version ??
+    vscode.extensions.getExtension("kilocode.kilo-code")?.packageJSON?.version ??
+    "unknown"
   private cachedProvidersMessage: unknown = null
   /**
    * Provider API keys retained extension-side for authenticated model
@@ -1021,6 +1026,7 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
           exportTranscript: (sessionID) => this.handleExportSessionTranscript(sessionID),
           copy: (text) => vscode.env.clipboard.writeText(text),
           openSessions: (ids) => this.trackOpenSessions(ids),
+          extensionVersion: this.extensionVersion,
         })
       ) {
         return
@@ -1707,6 +1713,11 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
         if (this.connectionState !== state) {
           this.connectionGeneration++
           this.configBindings.clear()
+          // The webview may still hold a binding id from before this transition (e.g. a
+          // reload-triggered SSE reconnect just cleared it above) — without this, the next
+          // save silently fails the ConfigBindings.get() check in handleUpdateConfig with
+          // "Settings changed or expired," even though nothing about the user's edit conflicted.
+          this.postMessage({ type: "configBindingExpired", reason: "reconnected" })
         }
         this.connectionState = state
         this.postConnectionState(error)
