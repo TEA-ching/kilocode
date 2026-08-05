@@ -73,7 +73,7 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
       // kilocode_change start
       repository: {
         type: "git",
-        url: "https://github.com/Kilo-Org/kilocode",
+        url: pkg.repository?.url ?? "https://github.com/Kilo-Org/kilocode",
       },
       // kilocode_change end
     },

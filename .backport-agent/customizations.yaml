@@ -329,6 +329,22 @@ customizations:
       the workflow builds the CLI ONCE under the renamed identity, then aliases the renamed dist dirs
       back to the original expected names via symlinks before invoking the unmodified build script.
 
+      SECOND GOTCHA (hit in production, first preview publish run): packages/opencode/script/build.ts
+      (per-platform dist package.json) and packages/opencode/script/publish.ts (the aggregate
+      `@sctg/keypool-code-cli` package.json) both write a `repository.url` field into the package.json
+      they generate for npm. Until this was fixed, that field was a hardcoded literal
+      ("https://github.com/Kilo-Org/kilocode"), so every published tarball's repository.url stayed
+      pinned to the real kilocode repo no matter what the CI rename step patched. npm's provenance
+      verification (this workflow publishes with `--provenance`) cross-checks the tarball's
+      `repository.url` against the GitHub OIDC attestation's actual repo (TEA-ching/kilocode) and
+      rejects the publish with `E422 ... expected to match "https://github.com/TEA-ching/kilocode"
+      from provenance` when they don't match — every per-platform package failed this way in the
+      first real run. Fix: both scripts now read `pkg.repository?.url` (falling back to the literal
+      for the real kilocode build, where no CI rename step runs) instead of hardcoding the string, and
+      packages/opencode/package.json gained a real `repository` field so `pkg.repository` exists for
+      TypeScript to type-check — the CI rename step's existing `.repository.url = ...` jq patch (which
+      already ran before this fix, just uselessly) now actually reaches npm.
+
       Deliberately reuses the real packages/opencode/script/{build,publish}.ts and
       packages/kilo-vscode/script/build.ts unmodified (never forked/duplicated) — they're complex
       (bwrap sandbox staging, tree-sitter wasm bundling, kilo-console build, multi-target native
@@ -356,6 +372,7 @@ customizations:
       - "The CLI rename step must patch BOTH packages/opencode/package.json's `.name` AND packages/opencode/bin/kilo's hardcoded '@kilocode/cli-' string — renaming only one produces a package that installs but cannot run (see GOTCHA above)."
       - "The VSIX rename step must patch packages/kilo-vscode/package.json's `.name` and `.publisher` to `keypool-code`/`sctg` (both — the user-facing extension id is publisher.name together), never just one."
       - "None of these renames may be committed to packages/opencode/package.json, packages/opencode/bin/kilo, or packages/kilo-vscode/package.json in the repo — they must stay CI-time-only patches (jq/sed) on an ephemeral checkout, so the real branch files keep matching upstream kilocode for backport purposes."
+      - "packages/opencode/script/build.ts and publish.ts must keep reading `pkg.repository?.url` for the `repository.url` field they write into generated package.json files, never a hardcoded string — npm's `--provenance` check rejects a publish whose repository.url doesn't match the actual repo the GitHub OIDC attestation was signed for (see SECOND GOTCHA above)."
       - "The workflow must keep gating on `github.repository == 'TEA-ching/kilocode'` (this fork), mirroring the `Kilo-Org/kilocode` gate used by every real kilocode release workflow, so it never accidentally runs on someone's own fork-of-a-fork."
     tests:
       - "bun run test:invariants"

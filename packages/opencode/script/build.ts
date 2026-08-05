@@ -401,7 +401,7 @@ for (const item of targets) {
         private: pkg.private,
         repository: {
           type: "git",
-          url: "https://github.com/Kilo-Org/kilocode",
+          url: pkg.repository?.url ?? "https://github.com/Kilo-Org/kilocode",
         },
         // kilocode_change end
         ...(item.abi ? { libc: [item.abi] } : {}),
