@@ -22,6 +22,7 @@ import { LanguageBridge } from "./language-bridge"
 import { NotificationsProvider } from "./notifications"
 import { FeedbackProvider } from "./feedback"
 import { KiloEmbeddingModelsProvider } from "./kilo-embedding-models"
+import { KeypoolLiveEmbeddingModelsProvider } from "./keypoollive-embedding-models"
 import { ImageModelsProvider } from "./image-models"
 import { SpeechToTextPrewarm } from "../components/speech-to-text/SpeechToTextPrewarm"
 
@@ -76,11 +77,13 @@ const Root: ParentComponent = (props) => (
 const Session: ParentComponent = (props) => (
   <IndexingProvider>
     <KiloEmbeddingModelsProvider>
-      <ImageModelsProvider>
-        <NotificationsProvider>
-          <SessionProvider>{props.children}</SessionProvider>
-        </NotificationsProvider>
-      </ImageModelsProvider>
+      <KeypoolLiveEmbeddingModelsProvider>
+        <ImageModelsProvider>
+          <NotificationsProvider>
+            <SessionProvider>{props.children}</SessionProvider>
+          </NotificationsProvider>
+        </ImageModelsProvider>
+      </KeypoolLiveEmbeddingModelsProvider>
     </KiloEmbeddingModelsProvider>
   </IndexingProvider>
 )

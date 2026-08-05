@@ -47,6 +47,28 @@ export type EmbedderProvider =
   | "bedrock"
   | "openrouter"
   | "voyage"
+  | "keypoollive"
+
+/** A vault key resolved by the host process's `Keypool` singleton (see the host's
+ * indexing-worker-client.ts) — protocol tells `KeypoolLiveEmbedder` which wire format to use. */
+export type ResolvedKeypoolLiveKey = {
+  apiKey: string
+  endpoint?: string
+  protocol: string
+  userAgent?: string
+}
+
+/** Injected by the host environment so `KeypoolLiveEmbedder` never talks to the vault or
+ * `Keypool` rotation state directly — those live in the opencode host process, not here. */
+export interface KeypoolLiveClient {
+  resolveKey(vaultProviderName: string): Promise<ResolvedKeypoolLiveKey>
+  reportOutcome(
+    vaultProviderName: string,
+    apiKey: string,
+    ok: boolean,
+    usage?: { modelId: string; promptTokens: number },
+  ): void
+}
 
 export interface IndexProgressUpdate {
   systemStatus: IndexingState

@@ -24,6 +24,7 @@ export interface CodeIndexConfig {
   bedrockOptions?: { region: string; profile?: string }
   openRouterOptions?: { apiKey: string; specificProvider?: string }
   voyageOptions?: { apiKey: string }
+  keypoolLiveOptions?: { vaultProviderName: string }
   qdrantUrl?: string
   qdrantApiKey?: string
   searchMinScore?: number
@@ -56,6 +57,7 @@ export type PreviousConfigSnapshot = {
   openRouterApiKey?: string
   openRouterSpecificProvider?: string
   voyageApiKey?: string
+  keypoolLiveVaultProviderName?: string
   qdrantUrl?: string
   qdrantApiKey?: string
   fileExtensions: string[]

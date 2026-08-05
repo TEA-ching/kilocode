@@ -14,6 +14,7 @@ export const KeypoolLivePaths = {
   usage: "/keypoollive/usage",
   errors: "/keypoollive/errors",
   purge: "/keypoollive/purge",
+  embeddingModels: "/keypoollive/embedding-models",
 } as const
 
 export const KeypoolLiveUsageQuery = Schema.Struct({
@@ -54,6 +55,18 @@ const KeypoolLiveErrorsResponse = Schema.Struct({
 
 const KeypoolLivePurgeResponse = Schema.Struct({
   freedBytes: Schema.Number,
+})
+
+/** One vault model with `usage: "embedding"` — surfaced for the codebase-indexing model picker. */
+export const KeypoolLiveEmbeddingModel = Schema.Struct({
+  vaultProviderName: Schema.String,
+  modelId: Schema.String,
+  name: Schema.optional(Schema.String),
+  defaultDimensions: Schema.optional(Schema.Number),
+})
+
+const KeypoolLiveEmbeddingModelsResponse = Schema.Struct({
+  models: Schema.Array(KeypoolLiveEmbeddingModel),
 })
 
 /**
@@ -117,6 +130,19 @@ export const KeypoolLiveApi = HttpApi.make("keypoollive")
             identifier: "keypoollive.purge",
             summary: "Purge KeypoolLive usage/error stats",
             description: "Deletes all stored usage and error records (local files, or remote worker data).",
+          }),
+        ),
+        HttpApiEndpoint.get("embeddingModels", KeypoolLivePaths.embeddingModels, {
+          query: WorkspaceRoutingQuery,
+          success: described(
+            KeypoolLiveEmbeddingModelsResponse,
+            "Vault models usable for codebase-indexing embeddings",
+          ),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "keypoollive.embeddingModels",
+            summary: "List KeypoolLive embedding models",
+            description: 'Vault models with usage: "embedding", for the codebase-indexing provider picker.',
           }),
         ),
       )

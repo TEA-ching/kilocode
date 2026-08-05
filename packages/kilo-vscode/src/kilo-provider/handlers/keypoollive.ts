@@ -75,9 +75,10 @@ export async function routeKeypoolLiveMessage(
     const period = VALID_PERIODS.includes(message.period as (typeof VALID_PERIODS)[number])
       ? (message.period as (typeof VALID_PERIODS)[number])
       : "day"
-    await (isUsage
-      ? ctx.client.keypoollive.usage({ directory: ctx.dir, period }, { throwOnError: true })
-      : ctx.client.keypoollive.errors({ directory: ctx.dir }, { throwOnError: true })
+    await (
+      isUsage
+        ? ctx.client.keypoollive.usage({ directory: ctx.dir, period }, { throwOnError: true })
+        : ctx.client.keypoollive.errors({ directory: ctx.dir }, { throwOnError: true })
     )
       .then((response) =>
         ctx.post({
@@ -94,6 +95,18 @@ export async function routeKeypoolLiveMessage(
           error: error instanceof Error ? error.message : String(error),
         }),
       )
+    return true
+  }
+
+  if (message.type === "requestKeypoolLiveEmbeddingModels") {
+    if (!ctx.client) {
+      ctx.post({ type: "keypoolLiveEmbeddingModelsLoaded", models: [] })
+      return true
+    }
+    await ctx.client.keypoollive
+      .embeddingModels({ directory: ctx.dir }, { throwOnError: true })
+      .then((response) => ctx.post({ type: "keypoolLiveEmbeddingModelsLoaded", models: response.data.models }))
+      .catch(() => ctx.post({ type: "keypoolLiveEmbeddingModelsLoaded", models: [] }))
     return true
   }
 

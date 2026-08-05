@@ -39,6 +39,7 @@ export interface IndexingConfigInput {
   openRouterApiKey?: string
   openRouterSpecificProvider?: string
   voyageApiKey?: string
+  keypoolLiveVaultProviderName?: string
 }
 
 /**
@@ -66,6 +67,7 @@ export class CodeIndexConfigManager {
   private bedrockOptions?: { region: string; profile?: string }
   private openRouterOptions?: { apiKey: string; specificProvider?: string }
   private voyageOptions?: { apiKey: string }
+  private keypoolLiveOptions?: { vaultProviderName: string }
   private qdrantUrl?: string = "http://localhost:6333"
   private qdrantApiKey?: string
   private searchMinScore?: number
@@ -129,6 +131,9 @@ export class CodeIndexConfigManager {
       ? { apiKey: input.openRouterApiKey, specificProvider: input.openRouterSpecificProvider }
       : undefined
     this.voyageOptions = input.voyageApiKey ? { apiKey: input.voyageApiKey } : undefined
+    this.keypoolLiveOptions = input.keypoolLiveVaultProviderName
+      ? { vaultProviderName: input.keypoolLiveVaultProviderName }
+      : undefined
   }
 
   private captureSnapshot(): PreviousConfigSnapshot {
@@ -155,6 +160,7 @@ export class CodeIndexConfigManager {
       openRouterApiKey: this.openRouterOptions?.apiKey ?? "",
       openRouterSpecificProvider: this.openRouterOptions?.specificProvider ?? "",
       voyageApiKey: this.voyageOptions?.apiKey ?? "",
+      keypoolLiveVaultProviderName: this.keypoolLiveOptions?.vaultProviderName ?? "",
       qdrantUrl: this.qdrantUrl ?? "",
       qdrantApiKey: this.qdrantApiKey ?? "",
       fileExtensions: [...this.fileExtensions],
@@ -179,6 +185,8 @@ export class CodeIndexConfigManager {
     if (provider === "bedrock") return !!(this.bedrockOptions?.region && hasStore)
     if (provider === "openrouter") return !!(this.openRouterOptions?.apiKey && hasStore)
     if (provider === "voyage") return !!(this.voyageOptions?.apiKey && hasStore)
+    if (provider === "keypoollive")
+      return !!(this.keypoolLiveOptions?.vaultProviderName && this.modelId && this.currentModelDimension && hasStore)
     return false
   }
 
@@ -230,6 +238,7 @@ export class CodeIndexConfigManager {
     if ((prev.openRouterApiKey ?? "") !== (this.openRouterOptions?.apiKey ?? "")) return true
     if ((prev.openRouterSpecificProvider ?? "") !== (this.openRouterOptions?.specificProvider ?? "")) return true
     if ((prev.voyageApiKey ?? "") !== (this.voyageOptions?.apiKey ?? "")) return true
+    if ((prev.keypoolLiveVaultProviderName ?? "") !== (this.keypoolLiveOptions?.vaultProviderName ?? "")) return true
 
     // Qdrant connection changes
     if ((prev.qdrantUrl ?? "") !== (this.qdrantUrl ?? "") || (prev.qdrantApiKey ?? "") !== (this.qdrantApiKey ?? ""))
@@ -277,6 +286,7 @@ export class CodeIndexConfigManager {
       bedrockOptions: this.bedrockOptions,
       openRouterOptions: this.openRouterOptions,
       voyageOptions: this.voyageOptions,
+      keypoolLiveOptions: this.keypoolLiveOptions,
       qdrantUrl: this.qdrantUrl,
       qdrantApiKey: this.qdrantApiKey,
       searchMinScore: this.currentSearchMinScore,

@@ -513,6 +513,10 @@ export interface RequestKiloEmbeddingModelsMessage {
   type: "requestKiloEmbeddingModels"
 }
 
+export interface RequestKeypoolLiveEmbeddingModelsMessage {
+  type: "requestKeypoolLiveEmbeddingModels"
+}
+
 export interface RequestImageModelsMessage {
   type: "requestImageModels"
 }
@@ -1477,6 +1481,7 @@ export type WebviewMessage =
   | SetIndexingConsentMessage
   | RequestChatSettingsMessage
   | RequestKiloEmbeddingModelsMessage
+  | RequestKeypoolLiveEmbeddingModelsMessage
   | UpdateConfigMessage
   | OpenSettingsTabRequest
   | RequestNotificationSettingsMessage

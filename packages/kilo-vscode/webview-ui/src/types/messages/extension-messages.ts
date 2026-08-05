@@ -378,6 +378,18 @@ export interface KiloEmbeddingModelsLoadedMessage {
   catalog: KiloEmbeddingModelCatalog
 }
 
+export interface KeypoolLiveEmbeddingModel {
+  vaultProviderName: string
+  modelId: string
+  name?: string
+  defaultDimensions?: number
+}
+
+export interface KeypoolLiveEmbeddingModelsLoadedMessage {
+  type: "keypoolLiveEmbeddingModelsLoaded"
+  models: KeypoolLiveEmbeddingModel[]
+}
+
 export interface ImageModelsLoadedMessage {
   type: "imageModelsLoaded"
   models: Array<{ id: string; name: string; description?: string }>
@@ -1386,6 +1398,7 @@ export type ExtensionMessage =
   | IndexingSettingsLoadedMessage
   | ChatSettingsLoadedMessage
   | KiloEmbeddingModelsLoadedMessage
+  | KeypoolLiveEmbeddingModelsLoadedMessage
   | ImageModelsLoadedMessage
   | ProvidersLoadedMessage
   | AgentsLoadedMessage

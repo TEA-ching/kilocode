@@ -5,8 +5,65 @@ import type {
 } from "@kilocode/kilo-indexing/engine"
 import type { IndexingStatus } from "@kilocode/kilo-indexing/status"
 import { withTimeout } from "@/util/timeout"
-import type { Event, Log, Message, Request, Result } from "./indexing-worker-protocol"
+import type { Event, HostRequest, HostResult, Log, Message, Request, Result } from "./indexing-worker-protocol"
 import type { IndexingWarning } from "./indexing-warning"
+import { Keypool } from "@opencode-ai/core/keypoollive/keypool"
+import { getCachedVaultProvider, loadAiVault } from "@opencode-ai/core/keypoollive/vault"
+import { combinedModelId, type VaultProvider } from "@opencode-ai/core/keypoollive/types"
+import * as KeypoolUsageDb from "@opencode-ai/core/keypoollive/usage-db"
+
+// Best-effort key identity for usage recording — same accepted approximation (keyed by vault
+// provider name, race-prone under concurrent embedding calls) as chat's
+// packages/opencode/src/plugin/keypoollive.ts's `lastSelectedKey`.
+const lastSelectedKey = new Map<string, { keyOwner: string; keyHint: string }>()
+
+async function resolveVaultProvider(vaultProviderName: string): Promise<VaultProvider | null> {
+  const cached = getCachedVaultProvider(vaultProviderName)
+  if (cached) return cached
+  const vaultUrl = process.env["KEYPOOL_VAULT_URL"]
+  if (!vaultUrl) return null
+  const vault = await loadAiVault(vaultUrl)
+  return vault.providers[vaultProviderName] ?? null
+}
+
+async function handleKeypoolLiveResolveKey(task: Worker, request: HostRequest) {
+  try {
+    const vaultProvider = await resolveVaultProvider(request.input.vaultProviderName)
+    if (!vaultProvider) throw new Error(`KeypoolLive: unknown vault provider "${request.input.vaultProviderName}"`)
+    const aggressiveRotation = process.env["KEYPOOL_LIVE_AGGRESSIVE_ROTATION"] === "true"
+    const selected = Keypool.selectKey(request.input.vaultProviderName, vaultProvider.keys, {
+      forceRotate: aggressiveRotation,
+    })
+    if (!selected)
+      throw new Error(`KeypoolLive: no usable API key for vault provider "${request.input.vaultProviderName}"`)
+    lastSelectedKey.set(request.input.vaultProviderName, {
+      keyOwner: selected.owner,
+      keyHint: `***${selected.key.slice(-8)}`,
+    })
+    const result: HostResult = {
+      type: "host-result",
+      id: request.id,
+      method: "keypoolLiveResolveKey",
+      ok: true,
+      value: {
+        apiKey: selected.key,
+        endpoint: vaultProvider.endpoint,
+        protocol: vaultProvider.protocol,
+        userAgent: vaultProvider.userAgent,
+      },
+    }
+    task.postMessage(result)
+  } catch (err) {
+    const result: HostResult = {
+      type: "host-result",
+      id: request.id,
+      method: "keypoolLiveResolveKey",
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+    task.postMessage(result)
+  }
+}
 
 declare global {
   const KILO_INDEXING_WORKER_PATH: string
@@ -77,9 +134,29 @@ export namespace IndexingWorker {
       if (shared === state) shared = undefined
     }
 
-    state.task.onmessage = (event: MessageEvent<Message>) => {
+    state.task.onmessage = (event: MessageEvent<Message | HostRequest>) => {
       const message = event.data
+      if (message.type === "host-request") {
+        if (message.method === "keypoolLiveResolveKey") handleKeypoolLiveResolveKey(state.task, message)
+        return
+      }
       if (message.type === "event") {
+        if (message.event === "keypoolLiveOutcome") {
+          const outcome = message.data.ok ? Keypool.markUsed : Keypool.markFailed
+          outcome(message.data.vaultProviderName, message.data.apiKey)
+          if (message.data.ok && message.data.modelId) {
+            const key = lastSelectedKey.get(message.data.vaultProviderName)
+            KeypoolUsageDb.recordUsage({
+              provider: message.data.vaultProviderName,
+              modelId: combinedModelId(message.data.vaultProviderName, message.data.modelId),
+              keyOwner: key?.keyOwner ?? "unknown",
+              keyHint: key?.keyHint ?? "unknown",
+              promptTokens: message.data.promptTokens ?? 0,
+              completionTokens: 0,
+            })
+          }
+          return
+        }
         if (message.key) {
           state.hosts.get(message.key)?.event(message)
           return

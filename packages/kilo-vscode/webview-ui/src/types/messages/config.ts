@@ -83,6 +83,7 @@ export type IndexingProvider =
   | "bedrock"
   | "openrouter"
   | "voyage"
+  | "keypoollive"
 
 export interface IndexingConfig {
   enabled?: boolean
@@ -100,6 +101,7 @@ export interface IndexingConfig {
   bedrock?: { region?: string; profile?: string }
   openrouter?: { apiKey?: string; specificProvider?: string }
   voyage?: { apiKey?: string }
+  keypoollive?: { vaultProviderName?: string }
   qdrant?: { url?: string; apiKey?: string }
   lancedb?: { directory?: string }
   searchMinScore?: number

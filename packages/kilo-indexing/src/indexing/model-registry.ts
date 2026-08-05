@@ -54,6 +54,9 @@ const profiles: Record<string, Record<string, ModelProfile>> = {
   "vercel-ai-gateway": {
     "text-embedding-3-small": { dimension: 1536, scoreThreshold: 0.4 },
   },
+  // Dimension varies per vault model — always supplied explicitly via config.modelDimension
+  // (auto-filled from the vault's VaultModel.defaultDimensions when the model is selected).
+  keypoollive: {},
 }
 
 const defaults: Record<string, string> = {
@@ -67,6 +70,7 @@ const defaults: Record<string, string> = {
   openrouter: "openai/text-embedding-3-small",
   "openai-compatible": "",
   "vercel-ai-gateway": "text-embedding-3-small",
+  keypoollive: "",
 }
 
 export function getDefaultModelId(provider: EmbedderProvider): string {

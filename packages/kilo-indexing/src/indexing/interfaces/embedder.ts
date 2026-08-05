@@ -39,6 +39,7 @@ export type AvailableEmbedders =
   | "bedrock"
   | "openrouter"
   | "voyage"
+  | "keypoollive"
 
 export interface EmbedderInfo {
   name: AvailableEmbedders

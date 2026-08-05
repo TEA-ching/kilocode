@@ -19,6 +19,7 @@ const providers = [
   "bedrock",
   "openrouter",
   "voyage",
+  "keypoollive",
 ] as const satisfies readonly EmbedderProvider[]
 const stores = ["lancedb", "qdrant"] as const
 
@@ -98,6 +99,11 @@ export const IndexingConfig = z
       .strict()
       .optional()
       .describe("Voyage embedding provider options"),
+    keypoollive: z
+      .object({ vaultProviderName: z.string().optional() })
+      .strict()
+      .optional()
+      .describe("KeyPool Live embedding provider options — resolves keys from the vault"),
     qdrant: z
       .object({
         url: z.string().optional(),
@@ -213,6 +219,11 @@ export const IndexingSchema = Schema.Struct({
       apiKey: Schema.optional(Schema.String),
     }),
   ).annotate({ description: "Voyage embedding provider options" }),
+  keypoollive: Schema.optional(
+    Schema.Struct({
+      vaultProviderName: Schema.optional(Schema.String),
+    }),
+  ).annotate({ description: "KeyPool Live embedding provider options — resolves keys from the vault" }),
   qdrant: Schema.optional(
     Schema.Struct({
       url: Schema.optional(Schema.String),
@@ -237,9 +248,9 @@ export const IndexingSchema = Schema.Struct({
     description: "Maximum retry attempts for failed embedding batches (default: 3)",
   }),
   fileExtensions: Schema.optional(
-    Schema.mutable(
-      Schema.Array(Schema.String.check(Schema.isPattern(/^\s*\.?[A-Za-z0-9][A-Za-z0-9_+-]*\s*$/))),
-    ).check(Schema.isMinLength(1)),
+    Schema.mutable(Schema.Array(Schema.String.check(Schema.isPattern(/^\s*\.?[A-Za-z0-9][A-Za-z0-9_+-]*\s*$/)))).check(
+      Schema.isMinLength(1),
+    ),
   ).annotate({
     description: "File extension allowlist for codebase indexing (uses built-in defaults if omitted)",
   }),
@@ -280,5 +291,6 @@ export function toIndexingConfigInput(cfg: IndexingConfig | undefined): Indexing
     openRouterApiKey: cfg?.openrouter?.apiKey,
     openRouterSpecificProvider: cfg?.openrouter?.specificProvider,
     voyageApiKey: cfg?.voyage?.apiKey,
+    keypoolLiveVaultProviderName: cfg?.keypoollive?.vaultProviderName,
   }
 }

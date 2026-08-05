@@ -1,7 +1,7 @@
-import type { CodeIndexManager } from "@kilocode/kilo-indexing/engine"
+import type { CodeIndexManager, KeypoolLiveClient, ResolvedKeypoolLiveKey } from "@kilocode/kilo-indexing/engine"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { format } from "node:util"
-import type { Request, Result, Event, Log } from "./indexing-worker-protocol"
+import type { HostResult, Request, Result, Event, Log } from "./indexing-worker-protocol"
 import { parseQdrantWarning } from "./indexing-warning"
 
 type Entry = {
@@ -16,6 +16,37 @@ const queues = new Map<string, Promise<void>>()
 
 function send(message: Result | Event) {
   postMessage(message)
+}
+
+// Asks the host thread (main opencode process) to resolve/rotate a keypool-live vault key.
+// Rotation state (`Keypool`) is a host-thread singleton — see indexing-worker-client.ts.
+let hostRequestId = 0
+const pendingHostRequests = new Map<
+  number,
+  { resolve(value: ResolvedKeypoolLiveKey): void; reject(err: unknown): void }
+>()
+
+const keypoolLiveClient: KeypoolLiveClient = {
+  resolveKey(vaultProviderName) {
+    const id = hostRequestId++
+    postMessage({ type: "host-request", id, method: "keypoolLiveResolveKey", input: { vaultProviderName } })
+    return new Promise((resolve, reject) => pendingHostRequests.set(id, { resolve, reject }))
+  },
+  reportOutcome(vaultProviderName, apiKey, ok, usage) {
+    send({
+      type: "event",
+      event: "keypoolLiveOutcome",
+      data: { vaultProviderName, apiKey, ok, modelId: usage?.modelId, promptTokens: usage?.promptTokens },
+    })
+  },
+}
+
+function handleHostResult(message: HostResult) {
+  const pending = pendingHostRequests.get(message.id)
+  if (!pending) return
+  pendingHostRequests.delete(message.id)
+  if (message.ok) pending.resolve(message.value)
+  else pending.reject(new Error(message.error))
 }
 
 function write(level: Log["level"], args: unknown[]) {
@@ -53,6 +84,7 @@ async function init(request: Extract<Request, { method: "init" }>) {
     request.input.directory,
     request.input.root,
     request.input.baselineDirectory,
+    keypoolLiveClient,
   )
   const progress = manager.onProgressUpdate.on(() => {
     send({ type: "event", key: request.key, event: "status", data: status.normalizeIndexingStatus(manager) })
@@ -88,8 +120,13 @@ async function handle(request: Request) {
   }
 }
 
-onmessage = (event: MessageEvent<Request>) => {
-  const request = event.data
+onmessage = (event: MessageEvent<Request | HostResult>) => {
+  const message = event.data
+  if (message.type === "host-result") {
+    handleHostResult(message)
+    return
+  }
+  const request = message
   const prior = queues.get(request.key) ?? Promise.resolve()
   const task = prior.then(() => context.run(request.key, () => handle(request)))
   const queued = task.finally(() => {

@@ -1238,6 +1238,7 @@ export type IndexingConfig = {
     | "bedrock"
     | "openrouter"
     | "voyage"
+    | "keypoollive"
   model?: string | null
   dimension?: number | null
   vectorStore?: "lancedb" | "qdrant"
@@ -1275,6 +1276,9 @@ export type IndexingConfig = {
   }
   voyage?: {
     apiKey?: string
+  }
+  keypoollive?: {
+    vaultProviderName?: string
   }
   qdrant?: {
     url?: string
@@ -11992,6 +11996,42 @@ export type KeypoollivePurgeResponses = {
 }
 
 export type KeypoollivePurgeResponse = KeypoollivePurgeResponses[keyof KeypoollivePurgeResponses]
+
+export type KeypoolliveEmbeddingModelsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/keypoollive/embedding-models"
+}
+
+export type KeypoolliveEmbeddingModelsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type KeypoolliveEmbeddingModelsError = KeypoolliveEmbeddingModelsErrors[keyof KeypoolliveEmbeddingModelsErrors]
+
+export type KeypoolliveEmbeddingModelsResponses = {
+  /**
+   * Vault models usable for codebase-indexing embeddings
+   */
+  200: {
+    models: Array<{
+      vaultProviderName: string
+      modelId: string
+      name?: string
+      defaultDimensions?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    }>
+  }
+}
+
+export type KeypoolliveEmbeddingModelsResponse =
+  KeypoolliveEmbeddingModelsResponses[keyof KeypoolliveEmbeddingModelsResponses]
 
 export type KiloProfileData = {
   body?: never

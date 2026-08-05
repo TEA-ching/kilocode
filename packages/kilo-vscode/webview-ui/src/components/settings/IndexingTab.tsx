@@ -9,6 +9,7 @@ import { TextField } from "@kilocode/kilo-ui/text-field"
 import { useConfig } from "../../context/config"
 import { formatIndexingLabel, useIndexing } from "../../context/indexing"
 import { useKiloEmbeddingModels } from "../../context/kilo-embedding-models"
+import { useKeypoolLiveEmbeddingModels } from "../../context/keypoollive-embedding-models"
 import { useLanguage } from "../../context/language"
 import { useProvider } from "../../context/provider"
 import { useServer } from "../../context/server"
@@ -43,6 +44,7 @@ const allProviders: { value: ProviderId; label: string }[] = [
   { value: "bedrock", label: "AWS Bedrock" },
   { value: "openrouter", label: "OpenRouter" },
   { value: "voyage", label: "Voyage" },
+  { value: "keypoollive", label: "KeyPool Live" },
 ]
 
 const stores: Option[] = [
@@ -91,6 +93,7 @@ function providerFields(provider: ProviderId | undefined): Array<{ key: string; 
     ]
   }
   if (provider === "voyage") return [{ key: "apiKey", label: "API Key", placeholder: "pa-..." }]
+  if (provider === "keypoollive") return []
   return []
 }
 
@@ -165,6 +168,7 @@ const IndexingTab: Component = () => {
   const { globalConfig, projectConfig, settings, updateGlobalConfig, updateProjectConfig, updateSetting } = useConfig()
   const indexing = useIndexing()
   const embeds = useKiloEmbeddingModels()
+  const keypoolLiveEmbeds = useKeypoolLiveEmbeddingModels()
   const language = useLanguage()
   const provider = useProvider()
   const server = useServer()
@@ -220,6 +224,18 @@ const IndexingTab: Component = () => {
   const knownKiloModel = (model: string | null | undefined) =>
     getKiloEmbeddingModel(model ?? undefined, embeds.catalog())?.id
   const kiloValue = () => knownKiloModel(cfg().model) ?? kiloDefault()
+  const keypoolLiveModels = createMemo(() =>
+    keypoolLiveEmbeds.catalog().map((entry) => ({
+      value: `${entry.vaultProviderName}/${entry.modelId}`,
+      label: `${entry.vaultProviderName}/${entry.name ?? entry.modelId}`,
+      entry,
+    })),
+  )
+  const keypoolLiveValue = () => {
+    const vaultProviderName = cfg().keypoollive?.vaultProviderName
+    if (!vaultProviderName || !cfg().model) return undefined
+    return `${vaultProviderName}/${cfg().model}`
+  }
   const kiloAvailable = () => !!server.profileData() || provider.authStates()[KILO_PROVIDER_ID] !== undefined
   const selectedProvider = () => cfg().provider ?? (kiloAvailable() ? "kilo" : undefined)
   const staleKiloModel = () => selectedProvider() === "kilo" && !!cfg().model && !knownKiloModel(cfg().model)
@@ -261,9 +277,18 @@ const IndexingTab: Component = () => {
   }
 
   const saveModel = (value: string) => {
-    if (selectedProvider() === "kilo") return
+    if (selectedProvider() === "kilo" || selectedProvider() === "keypoollive") return
     const trimmed = value.trim()
     updateIndexing({ model: trimmed || null })
+  }
+
+  const saveKeypoolLiveModel = (entry: ReturnType<typeof keypoolLiveModels>[number] | undefined) => {
+    if (!entry) return
+    updateIndexing({
+      model: entry.entry.modelId,
+      dimension: entry.entry.defaultDimensions ?? null,
+      keypoollive: { vaultProviderName: entry.entry.vaultProviderName },
+    })
   }
 
   const providerValue = (group: string, key: string) => {
@@ -446,7 +471,26 @@ const IndexingTab: Component = () => {
             </SettingsRow>
           </Show>
         </Show>
-        <Show when={selectedProvider() !== "kilo"}>
+        <Show when={selectedProvider() === "keypoollive"}>
+          <SettingsRow
+            title={language.t("settings.indexing.model.title")}
+            description={description(language.t("settings.indexing.model.description"), [["model"]])}
+            tag={() => tag(scope(), [["model"]])}
+          >
+            <Select
+              options={keypoolLiveModels()}
+              current={keypoolLiveModels().find((item) => item.value === keypoolLiveValue())}
+              value={(item) => item.value}
+              label={(item) => item.label}
+              onSelect={saveKeypoolLiveModel}
+              variant="secondary"
+              size="small"
+              triggerVariant="settings"
+              placeholder="Select a vault embedding model"
+            />
+          </SettingsRow>
+        </Show>
+        <Show when={selectedProvider() !== "kilo" && selectedProvider() !== "keypoollive"}>
           <SettingsRow
             title={language.t("settings.indexing.model.title")}
             description={description(language.t("settings.indexing.model.description"), [["model"]])}
@@ -472,9 +516,13 @@ const IndexingTab: Component = () => {
                 : String(cfg().dimension)
             }
             placeholder={
-              selectedProvider() === "kilo" ? "Provided by Kilo" : language.t("settings.indexing.dimension.placeholder")
+              selectedProvider() === "kilo"
+                ? "Provided by Kilo"
+                : selectedProvider() === "keypoollive"
+                  ? "Provided by the selected vault model"
+                  : language.t("settings.indexing.dimension.placeholder")
             }
-            disabled={selectedProvider() === "kilo"}
+            disabled={selectedProvider() === "kilo" || selectedProvider() === "keypoollive"}
             onChange={(value) => saveNumber("dimension", value, { integer: true, min: 1 })}
           />
         </SettingsRow>

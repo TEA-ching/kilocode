@@ -1,6 +1,6 @@
 import path from "path"
 import type { IVectorStore, VectorStoreSearchResult } from "./interfaces"
-import type { IndexingState } from "./interfaces/manager"
+import type { IndexingState, KeypoolLiveClient } from "./interfaces/manager"
 import type { IndexingTelemetryEvent, IndexingTelemetryMeta, IndexingTelemetryTrigger } from "./interfaces/telemetry"
 import { CodeIndexConfigManager, type IndexingConfigInput } from "./config-manager"
 import { DEFAULT_VECTOR_STORE, INITIAL_MANAGER_RECOVERY_DELAY_MS, MAX_MANAGER_RECOVERY_ATTEMPTS } from "./constants"
@@ -61,6 +61,7 @@ export class CodeIndexManager {
     public readonly workspacePath: string,
     private readonly cacheDirectory: string,
     public readonly baselinePath?: string,
+    private readonly keypoolLiveClient?: KeypoolLiveClient,
   ) {
     this._stateManager = new CodeIndexStateManager()
   }
@@ -564,6 +565,7 @@ export class CodeIndexManager {
       this._cacheManager!,
       this.cacheDirectory,
       (event) => this.handleTelemetry(event),
+      this.keypoolLiveClient,
     )
     const ignoreInstance = await loadIgnore(this.workspacePath)
     const config = this._configManager!.getConfig()

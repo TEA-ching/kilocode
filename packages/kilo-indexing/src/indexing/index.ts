@@ -7,7 +7,13 @@ export { CodeIndexServiceFactory } from "./service-factory"
 export { CacheManager } from "./cache-manager"
 export { Emitter, type Disposable } from "./runtime"
 
-export type { ICodeIndexManager, IndexProgressUpdate, EmbedderProvider } from "./interfaces/manager"
+export type {
+  ICodeIndexManager,
+  IndexProgressUpdate,
+  EmbedderProvider,
+  KeypoolLiveClient,
+  ResolvedKeypoolLiveKey,
+} from "./interfaces/manager"
 
 export type {
   IndexingTelemetryEvent,

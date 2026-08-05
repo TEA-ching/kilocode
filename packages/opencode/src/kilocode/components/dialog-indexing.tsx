@@ -49,6 +49,7 @@ const PROVIDER_LABELS: Record<EmbeddingProvider, string> = {
   bedrock: "AWS Bedrock",
   openrouter: "OpenRouter",
   voyage: "Voyage",
+  keypoollive: "KeyPool Live",
 }
 
 type ProviderFieldDef = { key: string; label: string; placeholder: string; sensitive?: boolean }
@@ -73,6 +74,7 @@ const PROVIDER_FIELDS: Record<EmbeddingProvider, ProviderFieldDef[]> = {
     { key: "specificProvider", label: "Specific Provider", placeholder: "optional" },
   ],
   voyage: [{ key: "apiKey", label: "API Key", placeholder: "pa-...", sensitive: true }],
+  keypoollive: [],
 }
 
 const VECTOR_STORE_LABELS: Record<string, string> = {
@@ -646,6 +648,35 @@ export function DialogIndexing(props: DialogIndexingProps) {
               dialog.replace(() => (
                 <KiloModelSelect useSDK={props.useSDK} scope={scope()} indexing={indexing} raw={raw} />
               ))
+              break
+            }
+            if (indexing.provider === "keypoollive") {
+              const current = indexing.keypoollive?.vaultProviderName
+                ? `${indexing.keypoollive.vaultProviderName}/${indexing.model ?? ""}`
+                : (indexing.model ?? "")
+              const result = await DialogPrompt.show(dialog, "Embedding Model", {
+                value: current,
+                placeholder: "vaultProvider/modelId, e.g. mistral/codestral-embed",
+              })
+              if (result !== null) {
+                const trimmed = result.trim()
+                const slash = trimmed.indexOf("/")
+                const vaultProviderName = slash === -1 ? undefined : trimmed.slice(0, slash)
+                const modelId = slash === -1 ? trimmed : trimmed.slice(slash + 1)
+                await saveScopedIndexing(
+                  sdk,
+                  sync,
+                  scope(),
+                  raw,
+                  {
+                    ...raw,
+                    model: modelId || null,
+                    keypoollive: vaultProviderName ? { vaultProviderName } : undefined,
+                  },
+                  toast,
+                )
+              }
+              dialog.replace(() => <DialogIndexing useSDK={props.useSDK} scope={scope()} />)
               break
             }
             const result = await DialogPrompt.show(dialog, "Embedding Model", {

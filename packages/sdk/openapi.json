@@ -13601,6 +13601,107 @@
         ]
       }
     },
+    "/keypoollive/embedding-models": {
+      "get": {
+        "tags": ["keypoollive"],
+        "operationId": "keypoollive.embeddingModels",
+        "parameters": [
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vault models usable for codebase-indexing embeddings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "vaultProviderName": {
+                            "type": "string"
+                          },
+                          "modelId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "defaultDimensions": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["NaN"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["Infinity"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["-Infinity"]
+                              },
+                              {
+                                "type": "string",
+                                "enum": ["Infinity", "-Infinity", "NaN"]
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["vaultProviderName", "modelId"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["models"],
+                  "additionalProperties": false,
+                  "description": "Vault models usable for codebase-indexing embeddings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Vault models with usage: \"embedding\", for the codebase-indexing provider picker.",
+        "summary": "List KeypoolLive embedding models",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createKiloClient } from \"@kilocode/sdk\"\n\nconst client = createKiloClient()\nawait client.keypoollive.embeddingModels({\n  ...\n})"
+          }
+        ]
+      }
+    },
     "/kilo/profile": {
       "get": {
         "tags": ["kilo"],
@@ -28814,7 +28915,8 @@
               "vercel-ai-gateway",
               "bedrock",
               "openrouter",
-              "voyage"
+              "voyage",
+              "keypoollive"
             ]
           },
           "model": {
@@ -28942,6 +29044,15 @@
             "type": "object",
             "properties": {
               "apiKey": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "keypoollive": {
+            "type": "object",
+            "properties": {
+              "vaultProviderName": {
                 "type": "string"
               }
             },

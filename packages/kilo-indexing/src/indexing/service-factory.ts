@@ -13,10 +13,18 @@ import { VercelAiGatewayEmbedder } from "./embedders/vercel-ai-gateway"
 import { BedrockEmbedder } from "./embedders/bedrock"
 import { OpenRouterEmbedder } from "./embedders/openrouter"
 import { VoyageEmbedder } from "./embedders/voyage"
+import { KeypoolLiveEmbedder } from "./embedders/keypoollive"
 import { QdrantVectorStore } from "./vector-store/qdrant-client"
 import { LanceDBVectorStore } from "./vector-store/lancedb-vector-store"
 import { CodeParser, DirectoryScanner, FileWatcher } from "./processors"
-import type { AvailableEmbedders, ICodeParser, IEmbedder, IFileWatcher, IVectorStore } from "./interfaces"
+import type {
+  AvailableEmbedders,
+  ICodeParser,
+  IEmbedder,
+  IFileWatcher,
+  IVectorStore,
+  KeypoolLiveClient,
+} from "./interfaces"
 import type { CodeIndexConfigManager } from "./config-manager"
 import type { CacheManager } from "./cache-manager"
 import type { IndexingTelemetryMeta, IndexingTelemetryReporter } from "./interfaces/telemetry"
@@ -52,6 +60,7 @@ const policy = {
     timeout: REMOTE_EMBEDDER_VALIDATION_TIMEOUT_MS,
     error: "Connection failed. Please check the endpoint URL and network connectivity.",
   },
+  keypoollive: undefined,
 } satisfies Record<AvailableEmbedders, { timeout: number; error: string } | undefined>
 
 /**
@@ -68,6 +77,7 @@ export class CodeIndexServiceFactory {
     private readonly cacheManager: CacheManager,
     private readonly cacheDirectory: string,
     private readonly onTelemetry?: IndexingTelemetryReporter,
+    private readonly keypoolLiveClient?: KeypoolLiveClient,
   ) {}
 
   private getTelemetryMeta(): IndexingTelemetryMeta {
@@ -140,6 +150,16 @@ export class CodeIndexServiceFactory {
     if (provider === "voyage") {
       if (!config.voyageOptions?.apiKey) throw new Error("Voyage API key is required for embedding.")
       return new VoyageEmbedder(config.voyageOptions.apiKey, config.modelId)
+    }
+    if (provider === "keypoollive") {
+      if (!config.keypoolLiveOptions?.vaultProviderName)
+        throw new Error("A KeyPool Live vault provider is required for embedding.")
+      if (!this.keypoolLiveClient) throw new Error("KeyPool Live embeddings are not available in this environment.")
+      return new KeypoolLiveEmbedder(
+        this.keypoolLiveClient,
+        config.keypoolLiveOptions.vaultProviderName,
+        config.modelId,
+      )
     }
 
     throw new Error(`Unsupported embedder provider: ${provider}`)
