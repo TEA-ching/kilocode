@@ -20,7 +20,7 @@
     },
     "workingDir": "../tea-ching-kilocode",
     "sync": {
-        "maxCommitsPerRun": 8,
+        "maxCommitsPerRun": 50,
         "_comment_maxCommitsPerRun": "Starting value carried over from the cline fork's tuning (evolutions.md): 10 commits/run risked exhausting the orchestrator's context window on a busy day; 8 is the compromise that still keeps a daily cadence realistic.",
         "initialFetchDepth": 200,
         "maxFetchDepth": 2000,
@@ -42,10 +42,10 @@
         "_comment_fast": "Orchestrator for the tool loop. Carried over from the cline fork's tuning — generous free tier, reliable in practice.",
         "specialist": "mistral/devstral-latest",
         "_comment_specialist": "Conflict resolution (first attempt).",
-        "powerful": "cohere/command-a-reasoning-08-2025",
+        "powerful": "poolside/laguna-s-2.1",
         "_comment_powerful": "Resolution fallback + consensus second opinion. Different vendor from the specialist (mistral) so cross-vendor consensus actually catches doubtful resolutions. Free tier for the user.",
         "summarizer": "gemini/gemini-3-flash-preview",
-        "_comment_summarizer": "Context compaction."
+        "_comment_summarizer": "Context compaction with 1M context."
     },
     "ai": {
         "_comment": "AI guardrails. minAutoApplyConfidence is enforced in code (host gate in apply_resolved_file), not just in the prompt.",

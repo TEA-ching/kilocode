@@ -346,6 +346,24 @@ export namespace KilocodeConfigOverlay {
       })
   }
 
+  // Runtime-injected providers (e.g. keypoollive's opencode Hooks plugin) carry live
+  // functions (a custom fetch, etc.) in their config tree for the AI SDK to call at
+  // request time. Those values are meaningless for a settings preview and, unlike
+  // JSON.stringify, Effect's httpApi response encoder rejects the whole field outright
+  // when a Schema.Unknown value isn't strictly JSON-safe — so strip functions before
+  // they ever reach a Resolved.value/global/local field.
+  function jsonSafe(input: unknown): unknown {
+    if (Array.isArray(input)) return input.map((item) => (typeof item === "function" ? null : jsonSafe(item)))
+    if (isRecord(input)) {
+      return Object.fromEntries(
+        Object.entries(input)
+          .filter(([, v]) => typeof v !== "function")
+          .map(([k, v]) => [k, jsonSafe(v)]),
+      )
+    }
+    return input
+  }
+
   function resolved(input: {
     key: string
     path: string[]
@@ -361,9 +379,9 @@ export namespace KilocodeConfigOverlay {
     return {
       key: input.key,
       path: input.path,
-      value: input.value,
-      global: input.global,
-      local: input.local,
+      value: jsonSafe(input.value),
+      global: jsonSafe(input.global),
+      local: jsonSafe(input.local),
       source,
       inherited: input.scope === "project" && source === "global",
       overridden: input.scope === "project" ? input.hasLocal : source === "global",

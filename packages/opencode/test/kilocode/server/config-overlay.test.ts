@@ -370,6 +370,37 @@ describe("config overlay routes", () => {
     expect(body.targets.project.path).toBe(path.join(project.path, ".kilo", "kilo.json"))
   })
 
+  test("strips live functions from provider config so the overlay stays JSON-safe", async () => {
+    // Regression test: a runtime-injected provider (e.g. keypoollive's opencode Hooks
+    // plugin) carries a live `fetch` closure in its options for the AI SDK to call at
+    // request time. Effect's httpApi response encoder rejects the whole "provider"
+    // collection outright when a Schema.Unknown field isn't strictly JSON-safe, so the
+    // overlay must strip functions before building Resolved.value/global/local.
+    await using project = await tmpdir()
+
+    const body = await KilocodeConfigOverlay.resolve({
+      directory: project.path,
+      scope: "project",
+      effective: {
+        provider: {
+          keypoollive: {
+            name: "KeypoolLive",
+            options: { apiKey: "keypoollive-managed", fetch: async () => new Response() },
+          },
+        },
+      } as Config.Info,
+      global: {},
+      sources: [],
+    })
+
+    const entry = body.collections.provider?.find((item) => item.key === "keypoollive")
+    expect(entry).toBeDefined()
+    const value = entry?.value as { options?: { apiKey?: string; fetch?: unknown } } | undefined
+    expect(value?.options?.apiKey).toBe("keypoollive-managed")
+    expect(value?.options?.fetch).toBeUndefined()
+    expect(() => JSON.stringify(body)).not.toThrow()
+  })
+
   test.serial("tolerates unsafe project config instead of failing the overlay", async () => {
     await using project = await tmpdir()
     // A project config that references a file outside the project root throws during substitution.
