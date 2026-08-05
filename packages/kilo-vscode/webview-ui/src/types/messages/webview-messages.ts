@@ -1190,6 +1190,18 @@ export interface PurgeKeypoolLiveStatsMessage {
   requestID: string
 }
 
+export interface CheckExtensionUpdateMessage {
+  type: "checkExtensionUpdate"
+  requestID: string
+}
+
+export interface InstallExtensionUpdateMessage {
+  type: "installExtensionUpdate"
+  requestID: string
+  downloadUrl: string
+  assetName: string
+}
+
 export interface ToggleRemoteMessage {
   type: "toggleRemote"
 }
@@ -1572,6 +1584,8 @@ export type WebviewMessage =
   | RequestKeypoolLiveUsageMessage
   | RequestKeypoolLiveErrorsMessage
   | PurgeKeypoolLiveStatsMessage
+  | CheckExtensionUpdateMessage
+  | InstallExtensionUpdateMessage
   | FetchMarketplaceDataMessage
   | FilterMarketplaceItemsMessage
   | InstallMarketplaceItemMessage

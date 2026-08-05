@@ -1,4 +1,4 @@
-import { Component, createSignal, onCleanup } from "solid-js"
+import { Component, createSignal, onCleanup, Show } from "solid-js"
 import { Button } from "@kilocode/kilo-ui/button"
 import { Icon } from "@kilocode/kilo-ui/icon"
 import { showToast } from "@kilocode/kilo-ui/toast"
@@ -7,6 +7,7 @@ import { useVSCode } from "../../context/vscode"
 import { useConfig } from "../../context/config"
 import type { Config, ConnectionState, ExtensionMessage, MigrationSource } from "../../types/messages"
 import { buildExport, parseImport, MAX_IMPORT_SIZE } from "./settings-io"
+import { buildDate } from "../../config/BuildDate"
 
 export interface AboutKiloCodeTabProps {
   port: number | null
@@ -22,6 +23,17 @@ const AboutKiloCodeTab: Component<AboutKiloCodeTabProps> = (props) => {
   const [importing, setImporting] = createSignal(false)
   const [exporting, setExporting] = createSignal(false)
   let epoch = 0
+
+  // ----- Extension update (KeyPool Live preview releases) -----
+  type CheckState = "idle" | "checking" | "update_available" | "up_to_date" | "error"
+  type InstallState = "idle" | "installing" | "done" | "error"
+  type UpdateInfo = { downloadUrl?: string; assetName?: string; tagName?: string; publishedAt?: string }
+  const [checkState, setCheckState] = createSignal<CheckState>("idle")
+  const [installState, setInstallState] = createSignal<InstallState>("idle")
+  const [updateInfo, setUpdateInfo] = createSignal<UpdateInfo | null>(null)
+  const [updateError, setUpdateError] = createSignal<string | null>(null)
+  let checkRequestID = ""
+  let installRequestID = ""
 
   const open = (url: string) => {
     vscode.postMessage({ type: "openExternal", url })
@@ -44,9 +56,34 @@ const AboutKiloCodeTab: Component<AboutKiloCodeTabProps> = (props) => {
     updateGlobalConfig({ indexing: { enabled } })
   }
 
-  // Listen for globalConfigLoaded response
+  // Listen for globalConfigLoaded / extension update responses
   const handler = (event: MessageEvent) => {
     const msg = event.data as ExtensionMessage
+
+    if (msg.type === "extensionUpdateCheckResult" && msg.requestID === checkRequestID) {
+      if (msg.error) {
+        setUpdateError(msg.error)
+        setCheckState("error")
+      } else if (msg.updateAvailable) {
+        setUpdateInfo({ downloadUrl: msg.downloadUrl, assetName: msg.assetName, tagName: msg.tagName, publishedAt: msg.publishedAt })
+        setCheckState("update_available")
+      } else {
+        setUpdateInfo({ tagName: msg.tagName, publishedAt: msg.publishedAt })
+        setCheckState("up_to_date")
+      }
+      return
+    }
+
+    if (msg.type === "extensionUpdateInstallResult" && msg.requestID === installRequestID) {
+      if (msg.success) {
+        setInstallState("done")
+      } else {
+        setUpdateError(msg.error ?? "Installation failed")
+        setInstallState("error")
+      }
+      return
+    }
+
     if (msg.type !== "globalConfigLoaded" || !exporting()) return
     setExporting(false)
     epoch++
@@ -62,6 +99,29 @@ const AboutKiloCodeTab: Component<AboutKiloCodeTabProps> = (props) => {
   }
   window.addEventListener("message", handler)
   onCleanup(() => window.removeEventListener("message", handler))
+
+  const handleCheckUpdate = () => {
+    setCheckState("checking")
+    setUpdateError(null)
+    setUpdateInfo(null)
+    setInstallState("idle")
+    checkRequestID = crypto.randomUUID()
+    vscode.postMessage({ type: "checkExtensionUpdate", requestID: checkRequestID })
+  }
+
+  const handleInstallUpdate = () => {
+    const info = updateInfo()
+    if (!info?.downloadUrl || !info.assetName) return
+    setInstallState("installing")
+    setUpdateError(null)
+    installRequestID = crypto.randomUUID()
+    vscode.postMessage({
+      type: "installExtensionUpdate",
+      requestID: installRequestID,
+      downloadUrl: info.downloadUrl,
+      assetName: info.assetName,
+    })
+  }
 
   // ----- Export -----
   const handleExport = () => {
@@ -193,6 +253,72 @@ const AboutKiloCodeTab: Component<AboutKiloCodeTabProps> = (props) => {
         <div style={{ display: "flex", "align-items": "center" }}>
           <span style={labelStyle}>{language.t("settings.aboutKiloCode.version.label")}</span>
           <span style={valueStyle}>{props.extensionVersion ?? "—"}</span>
+        </div>
+      </div>
+
+      {/* Extension Update (KeyPool Live preview releases) */}
+      <div style={sectionStyle}>
+        <h4 style={headingStyle}>{language.t("settings.aboutKiloCode.extensionUpdate.title")}</h4>
+        <p style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-foreground)", margin: "0 0 4px 0" }}>
+          {language.t("settings.aboutKiloCode.extensionUpdate.tagline", { version: props.extensionVersion ?? "—" })}
+        </p>
+        <p
+          style={{
+            "font-size": "var(--kilo-font-size-12)",
+            color: "var(--vscode-descriptionForeground)",
+            margin: "0 0 12px 0",
+          }}
+        >
+          {language.t("settings.aboutKiloCode.extensionUpdate.buildDate", { date: buildDate.toISOString() })}
+        </p>
+        <div style={{ display: "flex", "align-items": "center", gap: "8px", "flex-wrap": "wrap" }}>
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={checkState() === "checking" || installState() === "installing"}
+            onClick={handleCheckUpdate}
+          >
+            <Icon name="reload" />
+            {checkState() === "checking"
+              ? language.t("settings.aboutKiloCode.extensionUpdate.checking")
+              : language.t("settings.aboutKiloCode.extensionUpdate.checkButton")}
+          </Button>
+
+          <Show when={checkState() === "up_to_date"}>
+            <span style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-descriptionForeground)" }}>
+              {language.t("settings.aboutKiloCode.extensionUpdate.upToDate")}
+            </span>
+          </Show>
+
+          <Show when={checkState() === "update_available" && installState() === "idle"}>
+            <span style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-descriptionForeground)" }}>
+              {language.t("settings.aboutKiloCode.extensionUpdate.updateAvailable", {
+                tagName: updateInfo()?.tagName ?? "",
+              })}
+            </span>
+            <Button variant="primary" size="small" onClick={handleInstallUpdate}>
+              <Icon name="download" />
+              {language.t("settings.aboutKiloCode.extensionUpdate.installButton")}
+            </Button>
+          </Show>
+
+          <Show when={installState() === "installing"}>
+            <span style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-descriptionForeground)" }}>
+              {language.t("settings.aboutKiloCode.extensionUpdate.installing")}
+            </span>
+          </Show>
+
+          <Show when={installState() === "done"}>
+            <span style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-descriptionForeground)" }}>
+              {language.t("settings.aboutKiloCode.extensionUpdate.installed")}
+            </span>
+          </Show>
+
+          <Show when={(checkState() === "error" || installState() === "error") && updateError()}>
+            <span style={{ "font-size": "var(--kilo-font-size-12)", color: "var(--vscode-errorForeground)" }}>
+              {updateError()}
+            </span>
+          </Show>
         </div>
       </div>
 

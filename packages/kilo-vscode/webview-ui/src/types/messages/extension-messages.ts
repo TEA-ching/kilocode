@@ -949,6 +949,25 @@ export interface KeypoolLiveDashboardErrorMessage {
   error: string
 }
 
+export interface ExtensionUpdateCheckResultMessage {
+  type: "extensionUpdateCheckResult"
+  requestID: string
+  currentVersion: string
+  updateAvailable: boolean
+  downloadUrl?: string
+  assetName?: string
+  tagName?: string
+  publishedAt?: string
+  error?: string
+}
+
+export interface ExtensionUpdateInstallResultMessage {
+  type: "extensionUpdateInstallResult"
+  requestID: string
+  success: boolean
+  error?: string
+}
+
 export interface SandboxStatusErrorMessage {
   type: "sandboxStatusError"
   sessionID: string
@@ -1429,6 +1448,8 @@ export type ExtensionMessage =
   | KeypoolLiveErrorsMessage
   | KeypoolLivePurgedMessage
   | KeypoolLiveDashboardErrorMessage
+  | ExtensionUpdateCheckResultMessage
+  | ExtensionUpdateInstallResultMessage
   | SandboxStatusErrorMessage
   | AgentManagerMultiVersionProgressMessage
   | AgentManagerSetSessionModelMessage

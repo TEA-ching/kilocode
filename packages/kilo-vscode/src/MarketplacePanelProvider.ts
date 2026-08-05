@@ -40,8 +40,12 @@ export class MarketplacePanelProvider implements vscode.Disposable {
   private disposables: vscode.Disposable[] = []
   private subscriptions: Array<() => void> = []
   private readonly marketplace = new MarketplaceService()
+  // See the matching comment in KiloProvider.ts — a KeyPool Live preview VSIX ships as
+  // "sctg.keypool-code", not "kilocode.kilo-code".
   private readonly extensionVersion =
-    vscode.extensions.getExtension("kilocode.kilo-code")?.packageJSON?.version ?? "unknown"
+    vscode.extensions.getExtension("sctg.keypool-code")?.packageJSON?.version ??
+    vscode.extensions.getExtension("kilocode.kilo-code")?.packageJSON?.version ??
+    "unknown"
 
   constructor(
     private readonly extensionUri: vscode.Uri,

@@ -378,7 +378,69 @@ customizations:
       - "bun run test:invariants"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 6. kilocode-download (Rust download/update tool)
+  # 6. Extension Update (About tab — check/install KeyPool Live preview builds)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-extension-update
+    description: >
+      Adds a "Extension Update" section to the About tab
+      (packages/kilo-vscode/webview-ui/src/components/settings/AboutKiloCodeTab.tsx), modeled on
+      the cline fork's AboutSection.tsx: shows "Kilo Code v{version} with Keypool Live" + "Build
+      date: <buildDate>", a "Check for update" button, and (when a newer `preview/*` GitHub
+      release exists) an "Install update" button that downloads and installs the VSIX in place
+      via `workbench.extensions.installExtension`.
+
+      Unlike cline's version — which uses a gRPC ControllerService RPC pair
+      (keypoolCheckUpdate/keypoolInstallUpdate) — kilocode has no gRPC controller layer, so this
+      is a plain webview postMessage handler
+      (packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts, routed from
+      early-message.ts exactly like handlers/keypoollive.ts).
+
+      GOTCHA: kilocode's `preview/<datetime>` release tags (see keypoollive-release-workflow's
+      `release` job) carry ONLY a datetime, no separate semver — unlike cline's tags, which also
+      embed a version. extension-update.ts therefore compares BUILD DATES only (this fork's
+      packages/kilo-vscode/src/utils/build-date.ts vs the datetime embedded in the release tag),
+      not a "currentVersion -> latestVersion" string comparison — do not port cline's
+      dual version+date comparison logic verbatim, it doesn't fit this fork's tagging scheme.
+
+      GOTCHA: fixed a pre-existing bug while building this — KiloProvider.ts and
+      MarketplacePanelProvider.ts both read the extension's OWN version via
+      `vscode.extensions.getExtension("kilocode.kilo-code")`, a hardcoded id. A KeyPool Live
+      preview VSIX ships as "sctg.keypool-code" (see keypoollive-release-workflow), so that
+      lookup would silently return "unknown" in every preview build — both call sites now try
+      "sctg.keypool-code" first, falling back to "kilocode.kilo-code". This is load-bearing for
+      extension-update.ts's "currentVersion" field, not just cosmetic.
+
+      Two BuildDate.ts files must stay in lockstep (same literal ISO date string):
+      packages/kilo-vscode/src/utils/build-date.ts (host, read by extension-update.ts) and
+      packages/kilo-vscode/webview-ui/src/config/BuildDate.ts (webview, shown in the About tab).
+      Both default to "1974-05-26T13:00:00Z" (a placeholder, not a real build date) and are
+      overwritten at CI time by keypool-live-preview.yml's build-vscode job via a single `sed`
+      across both files — never edited by hand, never diverge from each other.
+    paths:
+      - "packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts"
+      - "packages/kilo-vscode/src/utils/build-date.ts"
+      - "packages/kilo-vscode/webview-ui/src/config/BuildDate.ts"
+    related_files:
+      - "packages/kilo-vscode/webview-ui/src/components/settings/AboutKiloCodeTab.tsx"
+      - "packages/kilo-vscode/src/kilo-provider/early-message.ts"
+      - "packages/kilo-vscode/src/KiloProvider.ts"
+      - "packages/kilo-vscode/src/MarketplacePanelProvider.ts"
+      - "packages/kilo-vscode/webview-ui/src/types/messages/webview-messages.ts"
+      - "packages/kilo-vscode/webview-ui/src/types/messages/extension-messages.ts"
+      - "packages/kilo-vscode/webview-ui/src/i18n/en.ts"
+      - ".github/workflows/keypool-live-preview.yml"
+    invariants:
+      - "extension-update.ts must compare build dates (this fork's build-date.ts vs the release tag's embedded datetime), not a version string — kilocode's preview tags have no separate semver to compare."
+      - "packages/kilo-vscode/src/utils/build-date.ts and packages/kilo-vscode/webview-ui/src/config/BuildDate.ts must always carry the identical literal ISO date string — CI stamps both from the same `sed` step in the same workflow step, never independently."
+      - "KiloProvider.ts's and MarketplacePanelProvider.ts's extensionVersion lookups must keep trying \"sctg.keypool-code\" before falling back to \"kilocode.kilo-code\" — removing the renamed-id lookup breaks currentVersion (and the About tab's Version Information display) specifically in preview builds, the one case this exists for."
+      - "The VSIX asset match in findBestVsixAsset() must keep using the \"kilo-vscode-<target>.vsix\" naming produced by packages/kilo-vscode/script/build.ts, with target = `${process.platform}-${process.arch}` (already matches directly, no normalization needed unlike cline's clinepool asset naming)."
+      - "extensionUpdateCheckResult/extensionUpdateInstallResult message handling in AboutKiloCodeTab.tsx must keep correlating on requestID (a fresh crypto.randomUUID() per check/install) — without it, a stale response from a previous check could resolve the wrong in-flight request."
+    tests:
+      - "bun run test:invariants"
+      - "pushd packages/kilo-vscode && bun run check-types && bun run check-types:webview && bun run lint && bun run check-kilocode-change && bun run knip ; popd"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 7. kilocode-download (Rust download/update tool)
   # ──────────────────────────────────────────────────────────────────────────
   - id: kilocode-download
     description: >
@@ -420,7 +482,7 @@ customizations:
       - "pushd packages/kilocode-download && cargo test ; popd"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 7. Backport-agent infrastructure
+  # 8. Backport-agent infrastructure
   # ──────────────────────────────────────────────────────────────────────────
   - id: backport-agent-infra
     description: >

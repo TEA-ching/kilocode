@@ -126,7 +126,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   build-vscode:
     name: Build VSIX (renamed for SCTG)
-    needs: build-cli
+    needs: [setup, build-cli]
     runs-on: ubuntu-24.04
     if: github.repository == 'TEA-ching/kilocode'
     steps:
@@ -175,6 +175,17 @@ jobs:
               .author.name = (.author.name + " - SCTG Development")' \
             packages/kilo-vscode/package.json > /tmp/kilo-vscode-package.json.tmp
           mv /tmp/kilo-vscode-package.json.tmp packages/kilo-vscode/package.json
+
+      # Stamps the "with Keypool Live" build date shown in the About tab (see
+      # AboutKiloCodeTab.tsx) and used by handlers/extension-update.ts to decide whether a
+      # `preview/<datetime>`-tagged release is actually newer than the running build. Both
+      # copies must carry the exact same literal, hence one sed across both files.
+      - name: Stamp build date into BuildDate.ts (host + webview)
+        run: |
+          sed -i.bak "s#1974-05-26T13:00:00Z#${{ needs.setup.outputs.datetime }}#" \
+            packages/kilo-vscode/src/utils/build-date.ts \
+            packages/kilo-vscode/webview-ui/src/config/BuildDate.ts
+          rm packages/kilo-vscode/src/utils/build-date.ts.bak packages/kilo-vscode/webview-ui/src/config/BuildDate.ts.bak
 
       - name: Build VSIX packages
         working-directory: packages/kilo-vscode
@@ -253,7 +264,12 @@ jobs:
 
       - name: Publish
         working-directory: packages/opencode
-        run: ./script/publish.ts
+        run: |
+          if [ -n "${{ secrets.NPMJS_TOKEN }}" ]; then
+            echo "Using NPMJS_TOKEN secret for npm publish"
+            npm config set //registry.npmjs.org/:_authToken="${{ secrets.NPMJS_TOKEN }}"
+          fi
+          ./script/publish.ts
         env:
           NPM_CONFIG_PROVENANCE: "true"
           GH_TOKEN: ${{ github.token }}

@@ -139,7 +139,20 @@ check_grep "CLI rename also patches the bin/kilo wrapper's hardcoded platform-pa
 check_grep "VSIX rename patches both name and publisher to keypool-code/sctg" '.publisher = "sctg"' .github/workflows/keypool-live-preview.yml
 check_absent "renamed package.json/bin patches are never committed (jq/sed target ephemeral checkout files only)" 'git commit' .github/workflows/keypool-live-preview.yml
 
-# ── 8. kilocode-download (Rust download/update tool) ────────────────────────
+# ── 8. Extension Update (About tab — check/install preview builds) ──────────
+check_file "extension-update handler" packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts
+check_file "host build-date.ts" packages/kilo-vscode/src/utils/build-date.ts
+check_file "webview BuildDate.ts" packages/kilo-vscode/webview-ui/src/config/BuildDate.ts
+check_grep "extension-update.ts compares build dates, not a version string" "tagBuildDateObj > buildDate" packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts
+check_grep "extension-update.ts targets the kilocode fork repo" 'GITHUB_REPO = "kilocode"' packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts
+check_grep "routeExtensionUpdateMessage wired into early-message.ts" "routeExtensionUpdateMessage" packages/kilo-vscode/src/kilo-provider/early-message.ts
+check_grep "KiloProvider.ts tries the renamed sctg.keypool-code id before the real one" '"sctg.keypool-code"' packages/kilo-vscode/src/KiloProvider.ts
+check_grep "MarketplacePanelProvider.ts tries the renamed sctg.keypool-code id before the real one" '"sctg.keypool-code"' packages/kilo-vscode/src/MarketplacePanelProvider.ts
+check_grep "host and webview BuildDate default to the same placeholder literal" '1974-05-26T13:00:00Z' packages/kilo-vscode/src/utils/build-date.ts
+check_grep "webview BuildDate default matches the host's placeholder literal" '1974-05-26T13:00:00Z' packages/kilo-vscode/webview-ui/src/config/BuildDate.ts
+check_grep "CI stamps both BuildDate.ts files from the same sed step" "packages/kilo-vscode/webview-ui/src/config/BuildDate.ts" .github/workflows/keypool-live-preview.yml
+
+# ── 9. kilocode-download (Rust download/update tool) ────────────────────────
 check_file "kilocode-download crate" packages/kilocode-download/Cargo.toml
 check_file "kilocode-download lib.rs" packages/kilocode-download/src/lib.rs
 check_grep "kilocode-download repo defaults to TEA-ching/kilocode" 'default_value = "TEA-ching/kilocode"' packages/kilocode-download/src/lib.rs
@@ -152,7 +165,7 @@ else
   ok "kilocode-download crate has no package.json (bun workspaces keep skipping it)"
 fi
 
-# ── 9. Backport-agent infra ─────────────────────────────────────────────────
+# ── 10. Backport-agent infra ────────────────────────────────────────────────
 check_file "customizations manifest" .backport-agent/customizations.yaml
 check_file "backport-agent config"   .backport-agent/config.json
 check_file "CLAUDE.md (fork-specific Claude Code context)" CLAUDE.md
