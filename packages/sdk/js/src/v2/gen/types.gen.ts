@@ -15832,6 +15832,8 @@ export type KeypoolliveRotateResponses = {
    */
   200: {
     rotated: boolean
+    keyHint: string
+    owner: string
   }
 }
 

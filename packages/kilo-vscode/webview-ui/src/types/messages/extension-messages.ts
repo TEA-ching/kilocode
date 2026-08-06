@@ -912,6 +912,8 @@ export interface KeypoolLiveRotatedMessage {
   type: "keypoolLiveRotated"
   requestID: string
   vaultProviderName: string
+  keyHint?: string
+  owner?: string
 }
 
 export interface KeypoolLiveRotateErrorMessage {

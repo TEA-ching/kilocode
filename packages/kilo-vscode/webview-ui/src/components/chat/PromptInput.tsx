@@ -719,10 +719,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (message.type === "keypoolLiveRotated") {
       if (message.requestID !== rotatingKeypoolLiveKey()) return
       setRotatingKeypoolLiveKey(undefined)
-      showToast({
-        variant: "success",
-        title: language.t("prompt.action.rotateKeypoolLiveKey.success"),
-      })
+      
+      // Show toast with key info if available
+      if (message.keyHint && message.owner) {
+        showToast({
+          variant: "success",
+          title: language.t("prompt.action.rotateKeypoolLiveKey.success"),
+          description: `${message.keyHint} • ${message.owner}`,
+        })
+      } else {
+        showToast({
+          variant: "success",
+          title: language.t("prompt.action.rotateKeypoolLiveKey.success"),
+        })
+      }
       return
     }
 

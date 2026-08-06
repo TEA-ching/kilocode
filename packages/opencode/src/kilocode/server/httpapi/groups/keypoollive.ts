@@ -84,6 +84,8 @@ export const KeypoolLiveRotatePayload = Schema.Struct({
 
 const KeypoolLiveRotateResponse = Schema.Struct({
   rotated: Schema.Boolean,
+  keyHint: Schema.NullOr(Schema.String),
+  owner: Schema.NullOr(Schema.String),
 })
 
 export const KeypoolLiveApi = HttpApi.make("keypoollive")

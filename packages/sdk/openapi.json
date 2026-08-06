@@ -13102,9 +13102,15 @@
                   "properties": {
                     "rotated": {
                       "type": "boolean"
+                    },
+                    "keyHint": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
                     }
                   },
-                  "required": ["rotated"],
+                  "required": ["rotated", "keyHint", "owner"],
                   "additionalProperties": false,
                   "description": "Whether a key rotation was recorded"
                 }

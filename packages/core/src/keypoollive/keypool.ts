@@ -267,3 +267,19 @@ export function markFailed(providerName: string, keyValue: string): void {
 export function rotate(providerName: string, _reason: "user_request" | "key_failure" = "user_request"): void {
   state.rotate(providerName)
 }
+
+/**
+ * Gets information about the current key that would be selected for a provider.
+ * Returns the key hint (first 6 chars + last 3 chars) and owner.
+ */
+export function getCurrentKeyInfo(providerName: string, keys: VaultKey[]): { keyHint: string; owner: string } | null {
+  const selected = state.selectKey(providerName, keys, false) // Don't force rotate, just get current
+  if (!selected) return null
+  
+  // Create key hint: first 6 characters + last 3 characters
+  const keyHint = selected.key.length > 9
+    ? `${selected.key.slice(0, 6)}***${selected.key.slice(-3)}`
+    : selected.key
+  
+  return { keyHint, owner: selected.owner }
+}
