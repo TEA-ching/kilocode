@@ -1,4 +1,4 @@
-  const handlePRSubmit = () => {
+const handlePRSubmit = () => {
     const url = prUrl().trim()
     if (!url || isPending()) return
     setPrPending(true)
