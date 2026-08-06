@@ -10,7 +10,9 @@
         "url": "https://github.com/Kilo-Org/kilocode.git",
         "repo": "Kilo-Org/kilocode",
         "branch": "main",
-        "remote": "upstream"
+        "remote": "upstream",
+        "cutDate": "2026-08-06T10:02:00+02:00",
+        "_comment_cutDate": "Everything up to and including Kilo-Org/kilocode@30221fef52 (the tip merged in by the 791-commit catch-up merge commit 7c5bd60069) is already in keypool-live's history. git cherry's ancestry check already excludes these, but this is a cheap second guard against the agent re-considering them."
     },
     "fork": {
         "url": "git@github.com:TEA-ching/kilocode.git",
@@ -20,8 +22,10 @@
     },
     "workingDir": "../tea-ching-kilocode",
     "sync": {
-        "maxCommitsPerRun": 50,
+        "maxCommitsPerRun": 8,
         "_comment_maxCommitsPerRun": "Starting value carried over from the cline fork's tuning (evolutions.md): 10 commits/run risked exhausting the orchestrator's context window on a busy day; 8 is the compromise that still keeps a daily cadence realistic.",
+        "bulkMergeThreshold": 40,
+        "_comment_bulkMergeThreshold": "Requires backport-agent >= 0.9.0. If a future gap ever again grows past 40 pending commits (this is what happened before the 2026-08-06 cutDate above), the agent switches from per-commit cherry-picking to one real `git merge` of the full range instead of repeating the 'massive repository-wide conflicts' failure loop every batch of maxCommitsPerRun. See backport-agent/README.md's 'Bulk merge mode' section.",
         "initialFetchDepth": 200,
         "maxFetchDepth": 2000,
         "batchSize": 3,

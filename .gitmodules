@@ -1,0 +1,3 @@
+[submodule "backport-agent"]
+	path = backport-agent
+	url = git@github.com:sctg-development/backport-agent.git
