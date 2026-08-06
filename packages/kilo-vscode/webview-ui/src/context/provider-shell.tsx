@@ -24,6 +24,7 @@ import { FeedbackProvider } from "./feedback"
 import { KiloEmbeddingModelsProvider } from "./kilo-embedding-models"
 import { KeypoolLiveEmbeddingModelsProvider } from "./keypoollive-embedding-models"
 import { ImageModelsProvider } from "./image-models"
+import { SpeechToTextModelsProvider } from "./speech-to-text-models"
 import { SpeechToTextPrewarm } from "../components/speech-to-text/SpeechToTextPrewarm"
 
 type MermaidImageEvent = CustomEvent<{ dataUrl: string; filename: string }>
@@ -79,9 +80,11 @@ const Session: ParentComponent = (props) => (
     <KiloEmbeddingModelsProvider>
       <KeypoolLiveEmbeddingModelsProvider>
         <ImageModelsProvider>
-          <NotificationsProvider>
-            <SessionProvider>{props.children}</SessionProvider>
-          </NotificationsProvider>
+          <SpeechToTextModelsProvider>
+            <NotificationsProvider>
+              <SessionProvider>{props.children}</SessionProvider>
+            </NotificationsProvider>
+          </SpeechToTextModelsProvider>
         </ImageModelsProvider>
       </KeypoolLiveEmbeddingModelsProvider>
     </KiloEmbeddingModelsProvider>

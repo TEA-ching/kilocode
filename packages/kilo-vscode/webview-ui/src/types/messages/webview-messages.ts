@@ -23,6 +23,7 @@ import type { MemoryShowMessage, MemoryOperationMessage, RequestMemoryMessage } 
 
 export interface SendMessageRequest {
   type: "sendMessage"
+  projectId?: string
   text: string
   messageID?: string
   sessionID?: string
@@ -521,6 +522,10 @@ export interface RequestImageModelsMessage {
   type: "requestImageModels"
 }
 
+export interface RequestSpeechToTextModelsMessage {
+  type: "requestSpeechToTextModels"
+}
+
 export interface OpenSettingsTabRequest {
   type: "openSettingsTab"
   tab: string
@@ -807,7 +812,7 @@ export interface ShowExistingLocalTerminalRequest {
 // Create a new xterm terminal in the given worktree context (null = workspace root)
 export interface AgentManagerTerminalCreateRequest {
   type: "agentManager.terminal.create"
-  /** Webview-generated correlation id, echoed back in created/error. */
+  /** Webview-generated logical terminal id, echoed back in created/error. */
   createId: string
   placement: TerminalPlacement
   worktreeId: string | null
@@ -887,6 +892,7 @@ export interface SetTabOrderRequest {
 // Persist sidebar worktree order
 export interface SetWorktreeOrderRequest {
   type: "agentManager.setWorktreeOrder"
+  projectId?: string
   order: string[]
 }
 
@@ -1634,6 +1640,7 @@ export type WebviewMessage =
   | AgentManagerTerminalDestinationSelectedRequest
   | AgentManagerTerminalResizeRequest
   | RequestImageModelsMessage
+  | RequestSpeechToTextModelsMessage
 
 // ============================================
 // VS Code API type

@@ -39,8 +39,11 @@ import {
 import { useLanguage } from "../src/context/language"
 import { useImageAttachments, type ImageAttachment } from "../src/hooks/useImageAttachments"
 import { useSpeechToText } from "../src/components/speech-to-text/useSpeechToText"
+import { useSpeechToTextModels } from "../src/context/speech-to-text-models"
+import { createSpeechShortcut } from "../src/components/speech-to-text/shortcut"
 import { convertToMentionPath } from "../src/utils/path-mentions"
 import { insertSpacedText } from "../src/components/chat/prompt-input-utils"
+import { useSlashCommand } from "../src/hooks/useSlashCommand"
 import { WandSparkles } from "@kilocode/kilo-ui/lucide"
 import { BranchSelect, BranchSelectPopover } from "../src/components/shared/BranchSelect"
 import { tracker } from "./telemetry"
@@ -49,8 +52,51 @@ import type { ModeRouter } from "./mode-router"
 
 type VersionCount = 1 | 2 | 3 | 4
 const VERSION_OPTIONS: VersionCount[] = [1, 2, 3, 4]
+const WORKTREE_PROMPT_COMMANDS = new Set(["models", "agents", "variant", "sandbox"])
+const WORKTREE_PROMPT_SCOPE = "agent-manager-worktree-prompt"
 
 type DialogTab = "new" | "import"
+type Model = { providerID: string; modelID: string }
+
+type DialogSelections = {
+  agent?: string
+  model?: Model
+  variant?: string
+  sandbox?: boolean
+}
+
+function readDialogSelections(value: unknown): DialogSelections {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  const data = value as Record<string, unknown>
+  const raw = data.model
+  const model = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : undefined
+
+  return {
+    agent: typeof data.agent === "string" ? data.agent : undefined,
+    model:
+      typeof model?.providerID === "string" && typeof model.modelID === "string"
+        ? { providerID: model.providerID, modelID: model.modelID }
+        : undefined,
+    variant: typeof data.variant === "string" ? data.variant : undefined,
+    sandbox: typeof data.sandbox === "boolean" ? data.sandbox : undefined,
+  }
+}
+
+function restoreAgent(value: string | undefined, list: Array<{ name: string }>, base: string): string {
+  if (!value) return base
+  if (list.length === 0) return value
+  return list.some((item) => item.name === value) ? value : base
+}
+
+function restoreModel(value: Model | undefined, providers: Record<string, unknown>, valid: (value: Model) => boolean) {
+  if (!value) return undefined
+  if (Object.keys(providers).length === 0) return value
+  return valid(value) ? value : undefined
+}
+
+function fallback<T>(value: T | undefined, get: () => T): T {
+  return value === undefined ? get() : value
+}
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent)
 
@@ -105,10 +151,14 @@ export const NewWorktreeDialog: Component<{
   const [name, setName] = createSignal("")
   const cached = vscode.getState<Record<string, unknown>>()
   const [prompt, setPrompt] = createSignal((cached?.advancedDialogPrompt as string) ?? "")
+  const saved = readDialogSelections(cached?.advancedDialogSelections)
   const [versions, setVersions] = createSignal<VersionCount>(1)
-  const initialAgent = session.selectedAgent()
-  const initialModel = session.modelForAgent(initialAgent)
-  const [model, setModel] = createSignal<{ providerID: string; modelID: string } | null>(initialModel)
+  const initialAgent = restoreAgent(saved.agent, session.agents(), session.selectedAgent())
+  const initialModel = fallback(
+    restoreModel(saved.model, provider.providers(), (value) => provider.isModelValid(value)),
+    () => session.modelForAgent(initialAgent),
+  )
+  const [model, setModel] = createSignal<Model | null>(initialModel)
   const [compareMode, setCompareMode] = createSignal(false)
   const [modelAllocations, setModelAllocations] = createSignal<ModelAllocations>(new Map())
   const [agent, setAgent] = createSignal(initialAgent)
@@ -120,8 +170,10 @@ export const NewWorktreeDialog: Component<{
   const [baseBranchOpen, setBaseBranchOpen] = createSignal(false)
   const [compareOpen, setCompareOpen] = createSignal(false)
   const [highlightedIndex, setHighlightedIndex] = createSignal(0)
-  const [variant, setVariant] = createSignal<string | undefined>(session.variantForAgent(initialAgent, initialModel))
-  const [sandbox, setSandbox] = createSignal<boolean | undefined>()
+  const [variant, setVariant] = createSignal<string | undefined>(
+    fallback(saved.variant, () => session.variantForAgent(initialAgent, initialModel)),
+  )
+  const [sandbox, setSandbox] = createSignal<boolean | undefined>(saved.sandbox)
   const [sandboxDefault, setSandboxDefault] = createSignal<boolean | undefined>()
   const [sandboxOverride, setSandboxOverride] = createSignal<boolean | undefined>()
   const [sandboxAvailable, setSandboxAvailable] = createSignal(true)
@@ -130,8 +182,9 @@ export const NewWorktreeDialog: Component<{
   const sandboxRequestID = crypto.randomUUID()
   const sandboxVisible = () => features().sandboxControls && globalConfig().sandbox?.enabled === true
   const speech = useSpeechToText(vscode, server, { t })
+  const speechModels = useSpeechToTextModels()
   const canUseSpeech = () => canUseSpeechToText(config(), provider.authStates())
-  const speechModel = () => selectedSpeechToTextModel(config())
+  const speechModel = () => selectedSpeechToTextModel(config(), speechModels.models())
   let prior: string | null = null
   let request: string | undefined
   const cancel = () => {
@@ -279,11 +332,49 @@ export const NewWorktreeDialog: Component<{
     vscode.setState({ ...state, advancedDialogImages: imgs.length > 0 ? imgs : undefined })
   }
 
+  createEffect(() => {
+    const state = vscode.getState<Record<string, unknown>>() ?? {}
+    vscode.setState({
+      ...state,
+      advancedDialogSelections: {
+        agent: agent(),
+        model: model(),
+        variant: variant(),
+        sandbox: sandbox(),
+      },
+    })
+  })
+
   // Auto-persist images to webview state on any change
   createEffect(() => persistImages(imageAttach.images()))
 
   let textareaRef: HTMLTextAreaElement | undefined
   let containerRef: HTMLDivElement | undefined
+
+  const setPromptValue = (value: string) => {
+    setPrompt(value)
+    persistPrompt(value)
+    adjustHeight()
+  }
+  const restorePrompt = () => {
+    requestAnimationFrame(() => textareaRef?.focus({ preventScroll: true }))
+  }
+  const slash = useSlashCommand(
+    vscode,
+    { action: toggleSandbox, enabled: () => sandboxVisible() && sandbox() !== undefined && sandboxAvailable() },
+    () => {
+      const hidden = new Set<string>()
+      if (session.agents().length < 2) hidden.add("agents")
+      if (variants().length === 0) hidden.add("variant")
+      if (!sandboxVisible()) hidden.add("sandbox")
+      return hidden
+    },
+    WORKTREE_PROMPT_COMMANDS,
+    WORKTREE_PROMPT_SCOPE,
+  )
+  const onFocusPrompt = () => restorePrompt()
+  window.addEventListener("focusPrompt", onFocusPrompt)
+  onCleanup(() => window.removeEventListener("focusPrompt", onFocusPrompt))
 
   onMount(() => {
     setBranchesLoading(true)
@@ -380,6 +471,17 @@ export const NewWorktreeDialog: Component<{
   }
 
   const onKey = (e: KeyboardEvent) => {
+    if (shortcut.down(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+
+    if (slash.onKeyDown(e, textareaRef, setPromptValue, restorePrompt)) {
+      e.stopPropagation()
+      return
+    }
+
     // Shift+Tab cycles reasoning effort variants (setting: chat.shiftTabCyclesVariant).
     // When disabled or no variants exist, fall through to default focus navigation.
     if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -428,6 +530,19 @@ export const NewWorktreeDialog: Component<{
   const startSpeech = () => {
     speech.start({ model: speechModel(), insert: insertSpeechText })
   }
+
+  const shortcut = createSpeechShortcut({
+    speech,
+    disabled: () => !canUseSpeech() || starting(),
+    start: startSpeech,
+    finish: (submit) => speech.stop(submit ? { done: handleSubmit } : undefined),
+  })
+  const speechUp = (e: KeyboardEvent) => {
+    if (!shortcut.up(e)) return
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  onCleanup(shortcut.reset)
 
   const canEnhance = () => !starting() && !enhancing() && !speech.active() && server.isConnected()
 
@@ -561,6 +676,33 @@ export const NewWorktreeDialog: Component<{
               onDragLeave={imageAttach.handleDragLeave}
               onDrop={imageAttach.handleDrop}
             >
+              <Show when={slash.show()}>
+                <div class="slash-command-dropdown am-slash-command-dropdown" data-component="popover-content">
+                  <Show
+                    when={slash.results().length > 0}
+                    fallback={<div class="slash-command-empty">No commands found</div>}
+                  >
+                    <For each={slash.results()}>
+                      {(cmd, index) => (
+                        <div
+                          class="slash-command-item"
+                          classList={{ "slash-command-item--active": index() === slash.index() }}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            if (textareaRef) slash.select(cmd, textareaRef, setPromptValue, restorePrompt)
+                          }}
+                          onMouseEnter={() => slash.setIndex(index())}
+                        >
+                          <span class="slash-command-name">/{cmd.name}</span>
+                          <Show when={cmd.description}>
+                            <span class="slash-command-desc">{cmd.description}</span>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                  </Show>
+                </div>
+              </Show>
               <Show when={imageAttach.images().length > 0}>
                 <div class="image-attachments">
                   <For each={imageAttach.images()}>
@@ -604,8 +746,10 @@ export const NewWorktreeDialog: Component<{
                       setPrompt(val)
                       persistPrompt(val)
                       adjustHeight()
+                      slash.onInput(val, e.currentTarget.selectionStart ?? val.length)
                     }}
                     onKeyDown={onKey}
+                    onKeyUp={speechUp}
                     onPaste={(e) => imageAttach.handlePaste(e)}
                     rows={3}
                     dir="auto"
@@ -619,6 +763,7 @@ export const NewWorktreeDialog: Component<{
                       agents={session.agents()}
                       value={agent()}
                       onSelect={selectAgent}
+                      trigger={WORKTREE_PROMPT_SCOPE}
                       portal={false}
                       deferDismiss
                     />
@@ -629,6 +774,9 @@ export const NewWorktreeDialog: Component<{
                       onSelect={(pid, mid) => {
                         if (pid && mid) setModel({ providerID: pid, modelID: mid })
                       }}
+                      onPick={restorePrompt}
+                      onCancel={restorePrompt}
+                      trigger={WORKTREE_PROMPT_SCOPE}
                       placement="top-start"
                       portal={false}
                       deferDismiss
@@ -637,6 +785,7 @@ export const NewWorktreeDialog: Component<{
                       variants={variants()}
                       value={effectiveVariant()}
                       onSelect={setVariant}
+                      trigger={WORKTREE_PROMPT_SCOPE}
                       portal={false}
                       deferDismiss
                       cycleHint={settings()["chat.shiftTabCyclesVariant"] !== false}

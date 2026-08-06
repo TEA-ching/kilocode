@@ -48,6 +48,7 @@ export interface SaveError {
 interface ConfigContextValue {
   config: Accessor<Config>
   globalConfig: Accessor<Config>
+  globalDraft: Accessor<Partial<Config>>
   projectConfig: Accessor<Config>
   collections: Accessor<ConfigCollections>
   settings: Accessor<Record<string, unknown>>
@@ -421,6 +422,7 @@ export const ConfigProvider: ParentComponent = (props) => {
   const value: ConfigContextValue = {
     config,
     globalConfig,
+    globalDraft,
     projectConfig,
     collections,
     settings,

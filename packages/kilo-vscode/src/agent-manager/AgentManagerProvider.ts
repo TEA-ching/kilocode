@@ -27,6 +27,7 @@ import { GitStatsPoller, type LocalStats, type WorktreePresenceResult, type Work
 import { PRStatusBridge } from "./pr-status-bridge"
 import { createPollers, type ProjectPollers } from "./project/pollers"
 import { GitOps } from "./GitOps"
+import type { GitExecutable } from "../util/git-executable"
 import { versionedName } from "./branch-name"
 import { BranchNamingController } from "./branch-naming"
 import { SetupScriptService } from "./SetupScriptService"
@@ -111,6 +112,7 @@ export class AgentManagerProvider implements Disposable {
   private onVisibilityChange: ((visible: boolean) => void) | undefined
   // Tracks sessions owned by this panel until they are explicitly closed.
   private panelSessions = new Set<string>()
+  private busySessions = new Set<string>()
 
   /** Session ID most recently loaded via `loadMessages`; updated synchronously. */
   private activeSessionId: string | undefined
@@ -122,6 +124,7 @@ export class AgentManagerProvider implements Disposable {
   constructor(
     private readonly host: Host,
     private readonly connectionService: KiloConnectionService,
+    binary: GitExecutable = () => Promise.resolve("git"),
   ) {
     this.outputChannel = host.createOutput("Kilo Agent Manager")
     this.terminalManager = new SessionTerminalManager(
@@ -175,7 +178,7 @@ export class AgentManagerProvider implements Disposable {
       log: (...args) => this.log(...args),
     })
     const semaphore = new Semaphore(3)
-    this.gitOps = new GitOps({ log: (...args) => this.log(...args), semaphore })
+    this.gitOps = new GitOps({ log: (...args) => this.log(...args), semaphore, binary })
     const wiring = createProjectWiring({
       host: this.host,
       git: this.gitOps,
@@ -219,6 +222,24 @@ export class AgentManagerProvider implements Disposable {
       state: () => this.state,
       root: () => this.getRoot(),
       activeId: () => this.contexts.active()?.id,
+      hot: () => {
+        const ids = new Set<string>()
+        const target = this.state?.getActiveTarget()
+        if (target?.kind === "worktree") ids.add(target.worktreeId)
+        if (target?.kind === "session") {
+          const id = this.state?.getSession(target.sessionId)?.worktreeId
+          if (id) ids.add(id)
+        }
+        for (const status of this.run.state().runStatuses) {
+          if (status.state === "running" || status.state === "stopping") ids.add(status.worktreeId)
+        }
+        for (const sid of this.busySessions) {
+          const owner = this.contexts.byLiveSession(sid)
+          const id = owner?.peekState()?.getSession(sid)?.worktreeId ?? this.state?.getSession(sid)?.worktreeId
+          if (id) ids.add(id)
+        }
+        return ids
+      },
       visible: () => this.panel?.visible ?? false,
       post: (msg) => this.postToWebview(msg),
       cache: (msg) => {
@@ -240,8 +261,9 @@ export class AgentManagerProvider implements Disposable {
         await this.stateReady
         return this.state
       },
-      stats: (refresh) => this.statsPoller.snapshot(refresh),
+      stats: () => this.statsPoller.snapshot(),
       prs: () => this.prBridge.snapshot(),
+      push: () => this.pushState(),
       managed: (id) => this.panelSessions.has(id) || !!this.state?.getSession(id),
       close: async (id) => {
         await this.onCloseSession(id)
@@ -260,7 +282,12 @@ export class AgentManagerProvider implements Disposable {
     this.unsubSessions = this.connectionService.onEventFiltered(
       (event) => {
         const type = (event as { type?: string }).type
-        return type === "session.created" || type === "session.updated" || type === "session.deleted"
+        return (
+          type === "session.created" ||
+          type === "session.updated" ||
+          type === "session.deleted" ||
+          type === "session.error"
+        )
       },
       (event) => this.onSessionLifecycle(event),
     )
@@ -273,9 +300,14 @@ export class AgentManagerProvider implements Disposable {
    */
   private onSessionLifecycle(event: unknown): void {
     const ev = event as { type?: string; properties?: { info?: Session; sessionID?: string } }
+    if (ev.type === "session.error") {
+      if (ev.properties?.sessionID) this.busySessions.delete(ev.properties.sessionID)
+      return
+    }
     if (ev.type === "session.deleted") {
       const id = ev.properties?.sessionID
       if (!id) return
+      this.busySessions.delete(id)
       const ctx = this.contexts.byLiveSession(id)
       if (!ctx) return
       ctx.removeLiveSession(id)
@@ -306,8 +338,13 @@ export class AgentManagerProvider implements Disposable {
     const sid = props?.sessionID
     const type = props?.status?.type
     if (!sid || !type) return
-    if (type === "idle") this.naming.idle(sid)
-    else this.naming.busy(sid)
+    if (type === "idle") {
+      this.busySessions.delete(sid)
+      this.naming.idle(sid)
+      return
+    }
+    this.busySessions.add(sid)
+    this.naming.busy(sid)
   }
 
   private log(...args: unknown[]) {
@@ -392,8 +429,10 @@ export class AgentManagerProvider implements Disposable {
         const ids = [...this.panelSessions]
         if (this.activeSessionId) ids.push(this.activeSessionId)
         this.panelSessions.clear()
+        this.busySessions.clear()
         void ctx.sessions.abortSessions(ids).catch((err) => this.log("Failed to abort sessions on panel close:", err))
         this.statsPoller.stop()
+        this.projectPollers.dispose()
         this.prBridge.poller.stop()
         this.diffs.stop()
         this.activeSessionId = undefined
@@ -449,12 +488,14 @@ export class AgentManagerProvider implements Disposable {
 
   /** Initialize an expanded background project and push its state (no panel wiring). */
   private initExpanded(ctx: ProjectContext): void {
-    void initContextState(ctx, (...args) => this.log(...args)).then((result) => {
-      if (!result.current) return
-      registerProjectSessions(ctx, this.panel?.sessions)
-      this.pushState(ctx)
-      this.projectPollers.sync(this.contexts)
-    })
+    void initContextState(ctx, (...args) => this.log(...args))
+      .then((result) => {
+        if (!result.current) return
+        registerProjectSessions(ctx, this.panel?.sessions)
+        this.pushState(ctx)
+        this.projectPollers.sync(this.contexts)
+      })
+      .catch((err) => this.log("Failed to initialize expanded project:", err))
   }
 
   // Message interceptor
@@ -733,7 +774,11 @@ export class AgentManagerProvider implements Disposable {
       return null
     }
     if (m.type === "agentManager.setWorktreeOrder") {
-      this.state?.setWorktreeOrder(m.order)
+      const state = this.getStateManager()
+      if (state) {
+        state.setWorktreeOrder(m.order)
+        this.pushState()
+      }
       return null
     }
     if (m.type === "agentManager.setSessionsCollapsed") {
@@ -1042,6 +1087,7 @@ export class AgentManagerProvider implements Disposable {
     if (!req) return
     if (directory) {
       req.directory = directory
+      req.projectId ??= this.contexts.byDirectory(directory)?.id
     }
     void this.startToolRequest(req)
   }
@@ -1373,6 +1419,7 @@ export class AgentManagerProvider implements Disposable {
       reviewDiffStyle: state.getReviewDiffStyle(),
       reviewMarkdownRender: getDiffMarkdownRender(),
       terminalDestination: this.destination.value(),
+      terminalFont: readTerminalFont(),
       isGitRepo: true,
       defaultBaseBranch: state.getDefaultBaseBranch(),
       activeTarget: state.getActiveTarget(),
@@ -1399,6 +1446,7 @@ export class AgentManagerProvider implements Disposable {
       reviewDiffStyle: "unified",
       reviewMarkdownRender: getDiffMarkdownRender(),
       terminalDestination: this.destination.value(),
+      terminalFont: readTerminalFont(),
       isGitRepo: false,
       runStatuses: [],
       runScriptConfigured: false,
@@ -1546,11 +1594,16 @@ export class AgentManagerProvider implements Disposable {
     this.statsPoller.stop()
     this.prBridge.reset()
     this.activeSessionId = undefined
+    this.busySessions.clear()
     this.cachedWorktreeStats = this.cachedLocalStats = undefined
     void this.sendRepoInfo()
     if (!reactivateProject(ctx, this.panel?.sessions, (c) => this.pushState(c)))
       this.stateReady = this.initializeState()
-    else this.projectPollers.sync(this.contexts)
+    else {
+      this.panel?.sessions.refreshSessions()
+      this.projectPollers.sync(this.contexts)
+    }
+    this.panel?.sessions.refreshGitStatus?.()
   }
   private onWorkspaceChanged(): void {
     if (this.contexts.syncPinned()) {
@@ -1562,11 +1615,20 @@ export class AgentManagerProvider implements Disposable {
   }
 
   private pushProjects(): void {
+    const projects = this.contexts.snapshots()
     this.postToWebview({
       type: "agentManager.projects",
       multiProject: this.host.multiProject(),
-      projects: this.contexts.snapshots(),
+      projects,
     })
+    if (this.panel) {
+      for (const project of projects) {
+        if (project.active || !project.expanded || !project.trusted || project.missing) continue
+        if (this.contexts.get(project.id)) continue
+        const ctx = this.contexts.expand(project.id)
+        if (ctx) this.initExpanded(ctx)
+      }
+    }
     this.projectPollers.sync(this.contexts)
   }
 

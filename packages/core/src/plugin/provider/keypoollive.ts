@@ -51,9 +51,9 @@
  * gives `kilo debug v2` visibility, and is ready for whenever provider.ts migrates to Catalog.
  */
 
-import { DateTime, Effect } from "effect"
+import { Effect } from "effect"
 import { ModelV2 } from "../../model"
-import { PluginV2 } from "../../plugin"
+import { define } from "../internal"
 import { ProviderV2 } from "../../provider"
 import { Keypool } from "../../keypoollive/keypool"
 import { getCachedVaultProvider, loadAiVault } from "../../keypoollive/vault"
@@ -134,11 +134,11 @@ function makeRotatingFetch(vaultProviderName: string, vaultProvider: VaultProvid
   return rotatingFetch
 }
 
-export const KeypoollivePlugin = PluginV2.define({
-  id: PluginV2.ID.make("keypoollive"),
-  effect: Effect.gen(function* () {
-    return {
-      "catalog.transform": Effect.fn(function* (evt) {
+export const KeypoollivePlugin = define({
+  id: "keypoollive",
+  effect: Effect.fn(function* (ctx) {
+    yield* ctx.catalog.transform(
+      Effect.fn(function* (evt) {
         const vaultUrl = process.env["KEYPOOL_VAULT_URL"]
         if (!vaultUrl) return
         const vault = yield* Effect.promise(() => loadAiVault(vaultUrl).catch(() => null))
@@ -168,7 +168,7 @@ export const KeypoollivePlugin = PluginV2.define({
                 input: model.supportsImages ? ["text", "image"] : ["text"],
                 output: ["text"],
               }
-              draft.time.released = DateTime.makeUnsafe(0)
+              draft.time.released = 0
               draft.cost = [
                 { input: model.inputPrice ?? 0, output: model.outputPrice ?? 0, cache: { read: 0, write: 0 } },
               ]
@@ -179,8 +179,10 @@ export const KeypoollivePlugin = PluginV2.define({
           }
         }
       }),
+    )
 
-      "aisdk.sdk": Effect.fn(function* (evt) {
+    yield* ctx.aisdk.sdk(
+      Effect.fn(function* (evt) {
         if (evt.model.providerID !== id) return
 
         const slashIndex = evt.model.id.indexOf("/")
@@ -231,6 +233,6 @@ export const KeypoollivePlugin = PluginV2.define({
           }
         }
       }),
-    }
+    )
   }),
 })

@@ -67,8 +67,10 @@ interface SideRequest {
 }
 
 export interface TerminalStateControls {
-  /** Record received from `terminal.created`. */
+  /** Add a terminal record to one context. */
   add(worktreeId: string | null, term: TerminalTabState): void
+  /** Fill an optimistic terminal record without replacing its xterm-owning object. */
+  attach(terminalId: string, input: Pick<TerminalTabState, "title" | "wsUrl" | "font">): boolean
   /** Drop a terminal from its context (location resolved automatically).
    *  Returns the removed record so callers can react to placement. */
   remove(terminalId: string): TerminalTabStateWithContext | undefined
@@ -296,6 +298,19 @@ export function createTerminalState(selection: Accessor<string | null>): Termina
       const enriched: TerminalTabStateWithContext = { ...term, contextKey: key }
       return { ...prev, [key]: [...list, enriched] }
     })
+  }
+
+  const attach = (terminalId: string, input: Pick<TerminalTabState, "title" | "wsUrl" | "font">) => {
+    const key = contextFor(terminalId)
+    const term = terminalsByContext()[key ?? ""]?.find((item) => item.id === terminalId)
+    if (!term) return false
+    // Keep the record reference stable so Solid's <For> never remounts the
+    // xterm that already owns focus and buffered input.
+    term.title = input.title
+    term.wsUrl = input.wsUrl
+    term.font = input.font
+    setTitle(terminalId, input.title)
+    return true
   }
 
   const remove = (terminalId: string): TerminalTabStateWithContext | undefined => {
@@ -549,6 +564,7 @@ export function createTerminalState(selection: Accessor<string | null>): Termina
 
   return {
     add,
+    attach,
     remove,
     contextFor,
     isScript,
@@ -603,12 +619,12 @@ export interface TerminalHandlerDeps {
   /** Sentinel value for the LOCAL sidebar selection. */
   LOCAL: string
   REVIEW_TAB_ID: string
+  getFont: () => TerminalFont
 }
 
 /** Correlation ids for terminal create requests. */
 function newId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID()
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  return `${TERMINAL_PREFIX}${crypto.randomUUID()}`
 }
 
 /**
@@ -637,13 +653,22 @@ export function createTerminalHandlers(deps: TerminalHandlerDeps) {
     })
   }
 
-  const createSide = () => {
+  const createSide = (focus = false) => {
     const key = deps.state.sideKey()
     // The wire protocol speaks plain worktree ids; `sideKey` is the
     // project-namespaced state key and must not leak into the message.
     const sel = deps.getSelection()
     const id = newId()
     deps.state.beginSide(key, id)
+    deps.state.add(key === deps.LOCAL ? null : key, {
+      id,
+      title: "Terminal",
+      wsUrl: "",
+      font: deps.getFont(),
+      placement: "side",
+    })
+    deps.state.setSideActive(key, id)
+    if (focus) deps.state.requestFocus(id)
     deps.postMessage({
       type: "agentManager.terminal.create",
       createId: id,
@@ -659,7 +684,7 @@ export function createTerminalHandlers(deps: TerminalHandlerDeps) {
    */
   const addSide = () => {
     deps.onShowSide(deps.state.sideKey())
-    createSide()
+    createSide(true)
   }
 
   /** Ensure the current context has a terminal without changing panel mode. */
@@ -684,7 +709,8 @@ export function createTerminalHandlers(deps: TerminalHandlerDeps) {
       deps.state.requestFocus(active)
       return
     }
-    ensureSide()
+    if (deps.state.pendingSide(key)) return
+    createSide(true)
   }
 
   const closeTerminal = (terminalId: string) => {
@@ -742,6 +768,7 @@ export function createTerminalHandlers(deps: TerminalHandlerDeps) {
       deps.postMessage({ type: "agentManager.terminal.close", terminalId })
       return true
     }
+    deps.state.completeSide(terminalId)
     deps.state.remove(terminalId)
     deps.postMessage({ type: "agentManager.terminal.close", terminalId })
     return true
@@ -825,12 +852,10 @@ export interface TerminalMessageHandlerDeps {
    * than wherever `tabIds()`'s base composition happens to put it.
    */
   onCreated?: (contextKey: string, terminalId: string) => void
-  /** Side terminal for a context finished creating. */
-  onSideCreated?: (contextKey: string, terminalId: string) => void
   /** Side terminal create failed for a context. */
   onSideError?: (contextKey: string) => void
   /** Side terminal was closed (locally or by the extension). */
-  onSideClosed?: (contextKey: string) => void
+  onSideClosed?: (contextKey: string, terminalId: string) => void
   /** A newly hydrated running script terminal belongs to the selected context. */
   onScriptRunning?: (contextKey: string, terminalId: string) => void
   /** The destination setting changed (live settings sync). */
@@ -858,14 +883,16 @@ function handleCreated(deps: TerminalMessageHandlerDeps, msg: CreatedMessage) {
     // reloaded (or the context is gone) — close the PTY again instead
     // of leaking it.
     const request = deps.state.completeSide(msg.createId)
-    if (!request || request.contextKey !== key) {
+    if (!request || request.contextKey !== key || msg.terminalId !== msg.createId) {
+      deps.state.remove(msg.createId)
       deps.postMessage({ type: "agentManager.terminal.close", terminalId: msg.terminalId })
       return
     }
-    deps.state.add(key === LOCAL ? null : key, term)
-    // The newest terminal becomes the visible one in its panel.
-    deps.state.setSideActive(key, msg.terminalId)
-    deps.onSideCreated?.(key, msg.terminalId)
+    // The user may have closed the optimistic terminal while the PTY was
+    // starting. The request was completed above, but its record is gone.
+    if (!deps.state.attach(msg.terminalId, term)) {
+      deps.postMessage({ type: "agentManager.terminal.close", terminalId: msg.terminalId })
+    }
     return
   }
   deps.state.add(key === LOCAL ? null : key, term)
@@ -901,11 +928,13 @@ export function createTerminalMessageHandler(deps: TerminalMessageHandlerDeps) {
     if (msg.type === "agentManager.terminal.closed") {
       const removed = deps.state.remove(msg.terminalId)
       if (deps.state.activeId() === msg.terminalId) deps.state.setActiveId(undefined)
-      if (removed?.placement === "side") deps.onSideClosed?.(removed.contextKey)
+      if (removed?.placement === "side") deps.onSideClosed?.(removed.contextKey, msg.terminalId)
       return true
     }
     if (msg.type === "agentManager.terminal.error") {
+      const context = msg.createId ? deps.state.contextFor(msg.createId) : undefined
       const request = msg.createId ? deps.state.completeSide(msg.createId) : undefined
+      if (msg.createId && context) deps.state.remove(msg.createId)
       if (request) deps.onSideError?.(request.contextKey)
       deps.showError(msg.message)
       return true
