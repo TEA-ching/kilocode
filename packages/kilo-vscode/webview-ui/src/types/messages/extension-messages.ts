@@ -679,6 +679,11 @@ export interface ThroughputSettingLoadedMessage {
   visible: boolean
 }
 
+export interface AutoApprovalReasonSettingLoadedMessage {
+  type: "autoApprovalReasonSettingLoaded"
+  visible: boolean
+}
+
 export interface WorkStyleLoadedMessage {
   type: "workStyleLoaded"
   style: WorkStyleState
@@ -1460,6 +1465,7 @@ export type ExtensionMessage =
   | NotificationSettingsLoadedMessage
   | TimelineSettingLoadedMessage
   | ThroughputSettingLoadedMessage
+  | AutoApprovalReasonSettingLoadedMessage
   | WorkStyleLoadedMessage
   | WorkStyleAppliedMessage
   | WorkStyleApplyFailedMessage
