@@ -268,7 +268,12 @@ jobs:
         run: |
           if [ -n "${{ secrets.NPMJS_TOKEN }}" ]; then
             echo "Using NPMJS_TOKEN secret for npm publish"
-            npm config set //registry.npmjs.org/:_authToken="${{ secrets.NPMJS_TOKEN }}"
+            # `npm config set` doesn't support running from inside an npm/bun workspace
+            # member (packages/opencode matches the root package.json's "workspaces" glob)
+            # — npm auto-detects that nesting from cwd alone and fails with ENOWORKSPACES.
+            # Run it from outside the checkout entirely; NPM_CONFIG_USERCONFIG already
+            # points at the target file regardless of cwd.
+            (cd "$RUNNER_TEMP" && npm config set //registry.npmjs.org/:_authToken="${{ secrets.NPMJS_TOKEN }}")
           fi
           ./script/publish.ts
         env:
