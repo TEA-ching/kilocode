@@ -12,6 +12,8 @@ export type ToolApproval = {
   source: "agent" | "global" | "project" | "yolo" | "session" | "manual" | "default"
   agent?: string
   rule?: { permission: string; pattern: string; action: string }
+  /** True when the tool call's target path was outside the workspace/worktree. */
+  outsideWorkspace?: boolean
 }
 
 /** Pre-resolved, localized text plus the raw approval, supplied by the caller. */
@@ -20,6 +22,7 @@ export type ToolApprovalDisplay = {
   decision: string
   source?: string
   rule?: string
+  outsideWorkspace?: string
 }
 
 const SOURCE_KEYS = ["agent", "global", "project", "yolo", "session", "manual", "default"] as const
@@ -87,6 +90,7 @@ export function resolveToolApproval(
     decision: approval.source === "manual" ? t("ui.approval.manual") : t("ui.approval.auto"),
     source: sourceText(),
     rule: ruleText,
+    outsideWorkspace: approval.outsideWorkspace ? t("ui.approval.outsideWorkspace") : undefined,
   }
 }
 
@@ -100,6 +104,9 @@ export function ToolApprovalLine(props: { display: ToolApprovalDisplay }) {
       <Show when={!manual()}>
         <Show when={props.display.source}>{(text) => <span data-slot="tool-approval-source">{text()}</span>}</Show>
         <Show when={props.display.rule}>{(text) => <span data-slot="tool-approval-rule">{text()}</span>}</Show>
+      </Show>
+      <Show when={props.display.outsideWorkspace}>
+        {(text) => <span data-slot="tool-approval-outside-workspace">{text()}</span>}
       </Show>
     </div>
   )
