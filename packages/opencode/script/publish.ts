@@ -4,12 +4,20 @@ import pkg from "../package.json"
 import { Script } from "@opencode-ai/script"
 import { fileURLToPath } from "url"
 import { NpmPublish } from "./kilocode/npm-publish" // kilocode_change
+import { tmpdir } from "os" // kilocode_change
+import { mkdtempSync } from "fs" // kilocode_change
+import { join } from "path" // kilocode_change
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 async function published(name: string, version: string) {
-  return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
+  // kilocode_change start
+  // Run outside the repo: this monorepo's root package.json declares "workspaces", and
+  // npm auto-detects that ancestry from cwd alone (no -w flag needed), forcing an
+  // explicit-spec command like this into a workspaces-aware path it doesn't support.
+  return (await $`npm view ${name}@${version} version`.nothrow().cwd(tmpdir())).exitCode === 0
+  // kilocode_change end
 }
 
 async function publish(dir: string, name: string, version: string) {
@@ -22,10 +30,15 @@ async function publish(dir: string, name: string, version: string) {
   }
   await $`bun pm pack`.cwd(dir)
   // kilocode_change start
+  // Move the tarball outside the repo before publishing, for the same reason as above —
+  // `npm publish` with an explicit tarball spec fails with ENOWORKSPACES from inside the
+  // workspaces-nested dist dir.
+  const out = mkdtempSync(join(tmpdir(), "npm-publish-"))
+  await $`mv *.tgz ${out}/`.cwd(dir)
   await NpmPublish.retry({
     name,
     version,
-    run: () => $`npm publish *.tgz --access public --tag ${Script.channel} --provenance`.cwd(dir),
+    run: () => $`npm publish *.tgz --access public --tag ${Script.channel} --provenance`.cwd(out),
     exists: () => published(name, version),
   })
   // kilocode_change end

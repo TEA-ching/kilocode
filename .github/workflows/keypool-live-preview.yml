@@ -273,13 +273,6 @@ jobs:
           ./script/publish.ts
         env:
           NPM_CONFIG_PROVENANCE: "true"
-          # packages/opencode is a member of this repo's root workspaces (see root
-          # package.json's "workspaces" field). npm auto-detects that nesting purely from
-          # directory structure — no -w/--workspace flag needed — and forces commands run
-          # from dist/<name> (an explicit tarball spec) into a workspaces-aware code path
-          # that doesn't support explicit specs, failing with ENOWORKSPACES. Explicitly
-          # opting out here is required; the fix is NOT to set workspace(s)=true.
-          NPM_CONFIG_WORKSPACES: "false"
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
 
