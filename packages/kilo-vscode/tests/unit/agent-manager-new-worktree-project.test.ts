@@ -4,6 +4,8 @@ import { join } from "node:path"
 
 const root = join(__dirname, "..", "..")
 const dialog = readFileSync(join(root, "webview-ui", "agent-manager", "NewWorktreeDialog.tsx"), "utf8")
+const app = readFileSync(join(root, "webview-ui", "agent-manager", "AgentManagerApp.tsx"), "utf8")
+const pending = readFileSync(join(root, "webview-ui", "agent-manager", "pending-create.ts"), "utf8")
 const importer = readFileSync(join(root, "src", "agent-manager", "worktree-importer.ts"), "utf8")
 const css = readFileSync(join(root, "webview-ui", "agent-manager", "agent-manager.css"), "utf8")
 
@@ -14,8 +16,15 @@ describe("Agent Manager New Worktree project targeting", () => {
     expect(dialog).toContain('type: "agentManager.requestBranches", projectId: id')
     expect(dialog).toContain('type: "agentManager.createMultiVersion"')
     expect(dialog).toContain("projectId: target")
-    expect(dialog).toContain('type: "agentManager.importFromPR", projectId: project()')
-    expect(dialog).toContain('type: "agentManager.importFromBranch", projectId: project()')
+    expect(dialog).toContain('type: "agentManager.importFromPR"')
+    expect(dialog).toContain('type: "agentManager.importFromBranch"')
+  })
+
+  it("does not replace a pending cross-project activation", () => {
+    expect(pending).toContain("if (pending()) return")
+    expect(app).toContain("usePendingCreate(activeProjectId")
+    expect(app).toContain('msg.type === "agentManager.importResult"')
+    expect(app).toContain("!msg.success) creation.abandon(msg.projectId)")
   })
 
   it("tags branch and import responses with their owning project", () => {
