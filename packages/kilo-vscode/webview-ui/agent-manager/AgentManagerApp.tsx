@@ -1871,7 +1871,7 @@ const AgentManagerContent: Component = () => {
     if (!loaded()) return
     expandSidebar()
     dialog.show(() => (
-      <NewWorktreeDialog mode={mode} onClose={() => dialog.close()} defaultBaseBranch={repoDefaultBranch()} />
+      <NewWorktreeDialog mode={mode} onClose={() => dialog.close()} defaultBase={() => repoDefaultBranch()} />
     ))
   }
 
