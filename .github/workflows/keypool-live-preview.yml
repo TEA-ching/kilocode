@@ -134,7 +134,7 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
 
@@ -215,10 +215,12 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
 
       - name: Verify npm trusted publishing prerequisites
         run: |
@@ -403,7 +405,7 @@ jobs:
             family: macos
             ext: ""
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Get kilocode-download version
         shell: bash
@@ -450,7 +452,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.repository == 'TEA-ching/kilocode'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
