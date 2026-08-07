@@ -25,7 +25,13 @@ async function publish(dir: string, name: string, version: string) {
   await NpmPublish.retry({
     name,
     version,
-    run: () => $`npm publish *.tgz --access public --tag ${Script.channel} --provenance`.cwd(dir),
+    run: () => {
+      // Ensure workspace configuration is set for npm publish
+      if (!process.env.NPM_CONFIG_WORKSPACE) {
+        process.env.NPM_CONFIG_WORKSPACE = 'true'
+      }
+      return $`npm publish *.tgz --access public --tag ${Script.channel} --provenance`.cwd(dir)
+    },
     exists: () => published(name, version),
   })
   // kilocode_change end

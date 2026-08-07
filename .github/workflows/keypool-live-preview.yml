@@ -264,18 +264,19 @@ jobs:
           mkdir -p packages/opencode/dist
           tar --zstd -xf /tmp/keypool-cli.tar.zst -C packages/opencode/dist
 
-      - name: Publish
-        working-directory: packages/opencode
-        run: |
-          if [ -n "${{ secrets.NPMJS_TOKEN }}" ]; then
-            echo "Using NPMJS_TOKEN secret for npm publish"
-            npm config set //registry.npmjs.org/:_authToken="${{ secrets.NPMJS_TOKEN }}"
-          fi
-          ./script/publish.ts
-        env:
-          NPM_CONFIG_PROVENANCE: "true"
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+       - name: Publish
+         working-directory: packages/opencode
+         run: |
+           if [ -n "${{ secrets.NPMJS_TOKEN }}" ]; then
+             echo "Using NPMJS_TOKEN secret for npm publish"
+             npm config set //registry.npmjs.org/:_authToken="${{ secrets.NPMJS_TOKEN }}"
+           fi
+           npm config set workspace true
+           ./script/publish.ts
+         env:
+           NPM_CONFIG_PROVENANCE: "true"
+           GH_TOKEN: ${{ github.token }}
+           GH_REPO: ${{ github.repository }}
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 5. Build kilocode-download (packages/kilocode-download), the Rust
