@@ -24,8 +24,8 @@
     "sync": {
         "maxCommitsPerRun": 8,
         "_comment_maxCommitsPerRun": "Starting value carried over from the cline fork's tuning (evolutions.md): 10 commits/run risked exhausting the orchestrator's context window on a busy day; 8 is the compromise that still keeps a daily cadence realistic.",
-        "bulkMergeThreshold": 40,
-        "_comment_bulkMergeThreshold": "Requires backport-agent >= 0.9.0. If a future gap ever again grows past 40 pending commits (this is what happened before the 2026-08-06 cutDate above), the agent switches from per-commit cherry-picking to one real `git merge` of the full range instead of repeating the 'massive repository-wide conflicts' failure loop every batch of maxCommitsPerRun. See backport-agent/README.md's 'Bulk merge mode' section.",
+        "bulkMergeThreshold": 30,
+        "_comment_bulkMergeThreshold": "Requires backport-agent >= 0.9.0. If a future gap ever again grows past 30 pending commits (this is what happened before the 2026-08-06 cutDate above), the agent switches from per-commit cherry-picking to one real `git merge` of the full range instead of repeating the 'massive repository-wide conflicts' failure loop every batch of maxCommitsPerRun. See backport-agent/README.md's 'Bulk merge mode' section.",
         "initialFetchDepth": 200,
         "maxFetchDepth": 2000,
         "batchSize": 3,
@@ -66,15 +66,16 @@
     },
     "validation": {
         "_comment": "test:invariants (deterministic invariant checks, <1s) is in every suite. See .backport-agent/check-fork-invariants.sh.",
-        "low": ["bun install && bun run test:invariants", "bun turbo typecheck"],
+        "_comment_jetbrains_filter": "kilo-jetbrains is upstream-shared, untouched by any customization in customizations.yaml, and its `typecheck` shells out to Gradle, which needs a pre-provisioned Java 21 toolchain (see root AGENTS.md). That's an environment dependency the backport-agent host may not have, so a missing/wrong Java there would otherwise block bulk-merge validation for commits that never touch kilo-jetbrains. The --filter excludes it from `bun turbo typecheck` in every tier; it's still covered by CI on the sync PR.",
+        "low": ["bun install && bun run test:invariants", "bun turbo typecheck --filter='!@kilocode/kilo-jetbrains'"],
         "medium": [
             "bun install && bun run test:invariants",
-            "bun turbo typecheck",
+            "bun turbo typecheck --filter='!@kilocode/kilo-jetbrains'",
             "pushd packages/core && bun test ; popd"
         ],
         "high": [
             "bun install && bun run test:invariants",
-            "bun turbo typecheck",
+            "bun turbo typecheck --filter='!@kilocode/kilo-jetbrains'",
             "pushd packages/core && bun test ; popd",
             "pushd packages/opencode && bun run typecheck && bun test ; popd",
             "pushd packages/kilo-vscode && bun run typecheck && bun run lint ; popd"
@@ -82,7 +83,7 @@
         "final": [
             "bun install",
             "bun run test:invariants",
-            "bun turbo typecheck",
+            "bun turbo typecheck --filter='!@kilocode/kilo-jetbrains'",
             "pushd packages/core && bun test ; popd",
             "pushd packages/opencode && bun run typecheck && bun test ; popd",
             "pushd packages/kilo-vscode && bun run typecheck && bun run lint && bun run test:unit ; popd",
