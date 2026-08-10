@@ -34,7 +34,7 @@
  * 5-minute in-memory cache to avoid repeated network calls and crypto overhead.
  */
 
-import type { AiConfig, AiVaultConfig } from "./types"
+import type { AiConfig, AiVaultConfig, VaultCrawler } from "./types" // kilocode_change - VaultCrawler added
 
 interface VaultCache {
   config: AiVaultConfig
@@ -102,7 +102,23 @@ async function fetchEncryptedVault(url: string, bearerToken?: string): Promise<s
 }
 
 function transformAiConfigToVaultConfig(aiConfig: AiConfig): AiVaultConfig {
-  const vaultConfig: AiVaultConfig = { version: aiConfig.version, providers: {} }
+  const vaultConfig: AiVaultConfig = { version: aiConfig.version, providers: {}, crawlers: {} } // kilocode_change - crawlers: {}
+  // kilocode_change start - parse the vault's "crawlers" bucket (e.g. Exa, Firecrawl)
+  for (const [crawlerName, crawler] of Object.entries(aiConfig.crawlers ?? {})) {
+    vaultConfig.crawlers[crawlerName] = {
+      protocol: crawler.protocol,
+      endpoint: crawler.endpoint,
+      keys: crawler.keys.map((k) => ({
+        key: k.key,
+        owner: k.owner ?? "unknown",
+        type: k.type ?? "paid",
+        quotaResetAt: k.quotaResetAt,
+        quotaExhaustedAt: k.quotaExhaustedAt,
+        managementKey: k.managementKey,
+      })),
+    } satisfies VaultCrawler
+  }
+  // kilocode_change end
   for (const [providerName, provider] of Object.entries(aiConfig.providers)) {
     vaultConfig.providers[providerName] = {
       protocol: provider.protocol,
@@ -114,6 +130,7 @@ function transformAiConfigToVaultConfig(aiConfig: AiConfig): AiVaultConfig {
         type: k.type ?? "paid",
         quotaResetAt: k.quotaResetAt,
         quotaExhaustedAt: k.quotaExhaustedAt,
+        managementKey: k.managementKey, // kilocode_change
       })),
       models: provider.models.map((m) => ({
         id: m.id,
@@ -172,3 +189,11 @@ export function getCachedVaultProvider(providerName: string) {
   if (!vaultCache) return null
   return vaultCache.config.providers[providerName] ?? null
 }
+
+// kilocode_change start
+/** Synchronously looks up a crawler (e.g. "exa") from the in-memory vault cache, or null. */
+export function getCachedVaultCrawler(crawlerName: string) {
+  if (!vaultCache) return null
+  return vaultCache.config.crawlers[crawlerName] ?? null
+}
+// kilocode_change end

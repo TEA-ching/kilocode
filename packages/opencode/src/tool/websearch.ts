@@ -3,6 +3,7 @@ import { HttpClient } from "effect/unstable/http"
 import * as Tool from "./tool"
 import * as McpWebSearch from "./mcp-websearch"
 import * as KiloExa from "@/kilocode/tool/websearch-kilo-exa" // kilocode_change - Kilo-REST Exa transport
+import * as KeypoolExa from "@/kilocode/tool/websearch-keypool-exa" // kilocode_change - KeypoolLive vault-rotated Exa transport
 import DESCRIPTION from "./websearch.txt"
 import { checksum } from "@opencode-ai/core/util/encode"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -119,19 +120,23 @@ export const WebSearchTool = Tool.define(
             parallel: flags.enableParallel,
           })
           const title = webSearchProviderLabel(provider)
-          // kilocode_change start - Kilo-REST Exa transport
+          // kilocode_change start - Kilo-REST + KeypoolLive Exa transports
           // Precedence:
-          //   provider="kilo-exa"          -> kilo-rest  (auth required)
-          //   provider="exa" + EXA_API_KEY -> mcp-exa-byok     (BYOK wins)
-          //   provider="exa" + Kilo auth   -> kilo-rest        (new default for authed users)
-          //   provider="exa" + no auth     -> mcp-exa-unauth   (preserves current fallback)
-          //   provider="parallel"          -> mcp-parallel     (unchanged)
+          //   provider="kilo-exa"                   -> kilo-rest       (auth required)
+          //   provider="exa" + EXA_API_KEY           -> mcp-exa-byok    (BYOK wins)
+          //   provider="exa" + KeypoolLive vault key -> mcp-exa-keypool (rotates free vault keys)
+          //   provider="exa" + Kilo auth              -> kilo-rest       (default for authed users)
+          //   provider="exa" + no auth                -> mcp-exa-unauth  (preserves current fallback)
+          //   provider="parallel"                     -> mcp-parallel    (unchanged)
           const kiloToken = yield* Effect.gen(function* () {
             if (provider !== "exa" && provider !== "kilo-exa") return undefined as string | undefined
             const info = yield* authSvc.get("kilo")
             if (!info) return undefined
             return info.type === "api" ? info.key : info.type === "oauth" ? info.access : undefined
           })
+          const keypoolKey = yield* Effect.promise(() =>
+            provider === "exa" && !process.env.EXA_API_KEY ? KeypoolExa.resolveExaCrawlerKey() : Promise.resolve(undefined),
+          )
           const transport =
             provider === "kilo-exa"
               ? "kilo-rest"
@@ -139,9 +144,11 @@ export const WebSearchTool = Tool.define(
                 ? "mcp-parallel"
                 : provider === "exa" && process.env.EXA_API_KEY
                   ? "mcp-exa-byok"
-                  : provider === "exa" && kiloToken
-                    ? "kilo-rest"
-                    : "mcp-exa-unauth"
+                  : provider === "exa" && keypoolKey
+                    ? "mcp-exa-keypool"
+                    : provider === "exa" && kiloToken
+                      ? "kilo-rest"
+                      : "mcp-exa-unauth"
           // kilocode_change end
           // kilocode_change start - add transport to metadata
           yield* ctx.metadata({
@@ -164,7 +171,7 @@ export const WebSearchTool = Tool.define(
             },
           })
 
-          // kilocode_change start - dispatch Kilo-REST transport
+          // kilocode_change start - dispatch Kilo-REST / KeypoolLive transports
           const result = yield* transport === "kilo-rest"
             ? kiloToken
               ? KiloExa.callKiloExa(
@@ -177,7 +184,19 @@ export const WebSearchTool = Tool.define(
                   kiloToken,
                 )
               : Effect.die(new Error("KILO_WEBSEARCH_PROVIDER=kilo-exa requires Kilo auth; run `kilo auth login`"))
-            : callProvider(http, provider, params, ctx)
+            : transport === "mcp-exa-keypool" && keypoolKey
+              ? KeypoolExa.call(
+                  http,
+                  {
+                    query: params.query,
+                    type: params.type,
+                    numResults: params.numResults,
+                    livecrawl: params.livecrawl,
+                    contextMaxCharacters: params.contextMaxCharacters,
+                  },
+                  keypoolKey,
+                )
+              : callProvider(http, provider, params, ctx)
           // kilocode_change end
 
           return {

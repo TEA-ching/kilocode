@@ -43,6 +43,10 @@ export interface VaultKey {
   quotaResetAt?: string
   /** ISO 8601 — when this key was flagged quota-exhausted (audit only). */
   quotaExhaustedAt?: string
+  // kilocode_change start
+  /** Service-level key (e.g. Exa's admin API) for querying this key's own usage/cost. */
+  managementKey?: string
+  // kilocode_change end
 }
 
 /** Metadata for a specific AI model available in the vault. */
@@ -74,10 +78,30 @@ export interface VaultProvider {
   models: VaultModel[]
 }
 
+// kilocode_change start
+/**
+ * Configuration for a web-crawling/search provider in the vault (e.g. Exa, Firecrawl) — a
+ * sibling bucket to `providers`, not an AI chat/embedding provider. Modeled separately because
+ * crawler entries have no `models` list and their keys may carry a `managementKey`.
+ */
+export interface VaultCrawler {
+  /** Communication protocol used by the crawler (e.g. exa, firecrawl). */
+  protocol: string
+  /** Optional custom API endpoint URL. */
+  endpoint?: string
+  /** Collection of API keys available for this crawler. */
+  keys: VaultKey[]
+}
+// kilocode_change end
+
 /** The top-level vault configuration structure as used by the extension/CLI. */
 export interface AiVaultConfig {
   version: number
   providers: Record<string, VaultProvider>
+  // kilocode_change start
+  /** Web-crawling/search provider entries (e.g. "exa", "firecrawl") — see {@link VaultCrawler}. */
+  crawlers: Record<string, VaultCrawler>
+  // kilocode_change end
 }
 
 /**
@@ -123,6 +147,7 @@ export interface AiKey {
   type?: AiKeyTier
   quotaResetAt?: string
   quotaExhaustedAt?: string
+  managementKey?: string // kilocode_change
 }
 
 export interface AiModel {
@@ -147,7 +172,17 @@ export interface AiProvider {
   models: AiModel[]
 }
 
+// kilocode_change start
+/** Wire format of a `crawlers` entry — see {@link VaultCrawler} for the transformed shape. */
+export interface AiCrawler {
+  protocol: string
+  endpoint?: string
+  keys: AiKey[]
+}
+// kilocode_change end
+
 export interface AiConfig {
   version: number
   providers: Record<string, AiProvider>
+  crawlers?: Record<string, AiCrawler> // kilocode_change
 }

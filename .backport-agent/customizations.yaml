@@ -135,6 +135,74 @@ customizations:
       - "pushd packages/core && bun test keypoollive ; popd"
 
   # ──────────────────────────────────────────────────────────────────────────
+  # 1b. KeypoolLive websearch (Exa key rotation for the local web-search tool)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: keypoollive-websearch
+    description: >
+      Rotates the vault's free Exa keys for the `websearch` tool, so no single free Exa
+      account's monthly quota gets exhausted on its own. The decrypted vault has a top-level
+      `crawlers` bucket (e.g. `crawlers.exa`, `crawlers.firecrawl`) that is a SIBLING of
+      `providers` (chat/embedding AI models) — structurally different (no `models` list, keys
+      may carry a `managementKey` for querying that key's own usage via Exa's admin API) and,
+      before this customization, completely unmodeled: packages/core/src/keypoollive/types.ts
+      only declared `AiConfig.providers`, and vault.ts's `transformAiConfigToVaultConfig`
+      silently dropped anything else — confirmed by grep, zero prior code read `crawlers`
+      anywhere in the repo.
+
+      IMPORTANT: this is unrelated to the two-provider-system architecture note at the top of
+      this file. `websearch` is a TOOL, not an LLM provider. There are also two parallel
+      `websearch.ts` tool implementations in this repo, same live/dead split shape as the
+      provider systems but for a different reason:
+        - packages/opencode/src/tool/websearch.ts (LIVE): registered via `Tool.define` into
+          packages/opencode/src/tool/registry.ts's `KiloToolRegistry`, consumed by
+          packages/opencode/src/session/prompt.ts — the real prompt/tool loop behind both
+          `kilo serve` and the VS Code extension.
+        - packages/core/src/tool/websearch.ts (DEBUG-ONLY): an Effect `Tools.Service`
+          registration consumed only by packages/core/src/session/runner/llm.ts
+          (`SessionRunner`), which itself only backs `kilo debug v2` — never real chat sessions.
+      This customization touches ONLY the live one. Do not "fix" the debug-only core tool to
+      match without first re-confirming (grep `SessionRunner` usage in packages/opencode/src)
+      that it is still unreachable from real requests — if `provider.ts` (v1) or the tool
+      registry ever migrates onto the core `SessionRunner`, both websearch.ts files would need
+      the keypool integration kept in sync.
+
+      Wiring: packages/opencode/src/tool/websearch.ts already had a multi-transport precedence
+      chain for its "exa" web-search provider (mcp-exa-byok / kilo-rest / mcp-exa-unauth, see
+      that file's inline "Precedence:" comment). This customization inserts a new
+      "mcp-exa-keypool" transport between BYOK and kilo-rest: when `EXA_API_KEY` is NOT set and
+      `KEYPOOL_VAULT_URL` IS set, packages/opencode/src/kilocode/tool/websearch-keypool-exa.ts
+      resolves `crawlers.exa` from the vault (via the same `loadAiVault`/`getCachedVaultCrawler`
+      cache as the AI-provider integration) and calls `Keypool.selectKey`/`markUsed`/
+      `markFailed` from the SAME rotation core as the chat-provider integration
+      (packages/core/src/keypoollive/keypool.ts) — but namespaced under the pool id
+      `"crawler:exa"`, not `"exa"`, so a future AI provider vault entry literally named "exa"
+      (there isn't one today) could never collide with the crawler's rotation state.
+
+      Deliberately does NOT wire a `fetch`-override/header-tagging dispatcher like
+      packages/opencode/src/plugin/keypoollive.ts's `makeDispatchFetch` — that mechanism only
+      exists because one shared AI-SDK provider-level `fetch` serves many different vault
+      sub-providers/protocols behind a single "keypoollive" provider id. websearch has exactly
+      one call site per request with a directly-awaited Effect, so key selection + mark-used/
+      mark-failed happens as a plain function call + `Effect.tap`/`Effect.tapError` around the
+      single `McpWebSearch.call`, no header trick needed.
+    paths:
+      - "packages/opencode/src/kilocode/tool/websearch-keypool-exa.ts"
+    related_files:
+      - "packages/opencode/src/tool/websearch.ts"
+      - "packages/opencode/src/tool/mcp-websearch.ts"
+      - "packages/core/src/keypoollive/types.ts"
+      - "packages/core/src/keypoollive/vault.ts"
+      - "packages/core/src/keypoollive/keypool.ts"
+    invariants:
+      - "packages/core/src/keypoollive/types.ts must keep a VaultCrawler/AiCrawler type distinct from VaultProvider/AiProvider — crawlers have no `models` list and their keys may carry a `managementKey`, so collapsing the two types would either lose managementKey or force a bogus empty `models: []` on every crawler."
+      - "vault.ts's transformAiConfigToVaultConfig must keep parsing `aiConfig.crawlers` into `AiVaultConfig.crawlers` — this is the only place the vault's crawlers bucket gets surfaced at all; dropping this silently re-breaks websearch key rotation with no visible error (loadAiVault would just return an empty crawlers map)."
+      - "websearch-keypool-exa.ts must keep using the pool id \"crawler:exa\" (not bare \"exa\") when calling Keypool.selectKey/markUsed/markFailed, to stay isolated from any AI-provider vault entry that might someday also be named \"exa\"."
+      - "websearch.ts's transport precedence must keep EXA_API_KEY (BYOK) taking priority over the vault-rotated key — an explicit env var is an intentional user override and must not be silently superseded by keypool rotation."
+      - "Any keypool-driven change to packages/opencode/src/tool/websearch.ts must re-confirm packages/core/src/tool/websearch.ts (the debug-only v2 tool) is still unreachable from live sessions before assuming it doesn't also need the change — see the description above for how to check."
+    tests:
+      - "bun run test:invariants"
+
+  # ──────────────────────────────────────────────────────────────────────────
   # 2. KeypoolLive server routes (rotation + usage dashboard)
   # ──────────────────────────────────────────────────────────────────────────
   - id: keypoollive-server-routes

@@ -115,7 +115,17 @@ check_grep "usage-db.ts falls back to KEYPOOL_USAGE_DB_DIR as a remote URL sourc
 check_grep "keypoollive.ts (v1) exports getLastSelectedKeyInfo for the custom loader to read" "export function getLastSelectedKeyInfo" packages/opencode/src/plugin/keypoollive.ts
 check_grep "keypoollive.ts (v1) tags each model with options.vaultProviderName" "options: { vaultProviderName }" packages/opencode/src/plugin/keypoollive.ts
 
-# ── 5. KeypoolLive webview UI (rotate button, Aggressive Rotation, dashboard) ─
+# ── 5. KeypoolLive websearch (Exa key rotation for the local web-search tool) ─
+check_file "keypoollive websearch Exa transport module" packages/opencode/src/kilocode/tool/websearch-keypool-exa.ts
+check_grep "types.ts models the vault's crawlers bucket" "VaultCrawler" packages/core/src/keypoollive/types.ts
+check_grep "vault.ts parses the crawlers bucket into AiVaultConfig.crawlers" "aiConfig.crawlers" packages/core/src/keypoollive/vault.ts
+check_grep "vault.ts exposes a cached crawler lookup" "export function getCachedVaultCrawler" packages/core/src/keypoollive/vault.ts
+check_grep "websearch-keypool-exa.ts namespaces its rotation pool separately from AI providers" '"crawler:exa"' packages/opencode/src/kilocode/tool/websearch-keypool-exa.ts
+check_grep "websearch-keypool-exa.ts marks used/failed keys back into the shared Keypool" "Keypool.markUsed" packages/opencode/src/kilocode/tool/websearch-keypool-exa.ts
+check_grep "websearch.ts wires the mcp-exa-keypool transport" "mcp-exa-keypool" packages/opencode/src/tool/websearch.ts
+check_grep "websearch.ts still lets BYOK EXA_API_KEY win over the vault-rotated key" "process.env.EXA_API_KEY" packages/opencode/src/tool/websearch.ts
+
+# ── 6. KeypoolLive webview UI (rotate button, Aggressive Rotation, dashboard) ─
 check_file "KeypoolLiveDashboard component" packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboard.tsx
 check_file "keypoollive webview<->host handler" packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts
 check_grep "rotate button gated on keypoollive provider" 'selectedModel()?.providerID === "keypoollive"' packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx
@@ -123,14 +133,14 @@ check_grep "Aggressive Rotation toggle present in ProvidersTab" "aggressiveRotat
 check_grep "keypoollive routing extracted out of KiloProvider.ts's frozen-complexity switch" "routeKeypoolLiveMessage" packages/kilo-vscode/src/kilo-provider/early-message.ts
 check_absent "no keypoollive case added to KiloProvider.ts's main dispatch switch" 'case "rotateKeypoolLiveKey"' packages/kilo-vscode/src/KiloProvider.ts
 
-# ── 6. Poolside ──────────────────────────────────────────────────────────────
+# ── 7. Poolside ──────────────────────────────────────────────────────────────
 # Poolside needs NO fork code: it's a genuine models.dev entry (verified against
 # https://models.dev/api.json — id "poolside", npm "@ai-sdk/openai-compatible"). A
 # self-registering poolside.ts (v2) plugin existed briefly and was removed as redundant —
 # this check guards against silently re-adding that dead weight.
 check_absent "no redundant self-registering poolside.ts (v2) plugin" "PoolsidePlugin" packages/core/src/plugin/provider.ts packages/core/src/plugin/provider/
 
-# ── 7. KeypoolLive preview release workflow (renamed extension + CLI) ───────
+# ── 8. KeypoolLive preview release workflow (renamed extension + CLI) ───────
 check_file "keypool-live-preview workflow" .github/workflows/keypool-live-preview.yml
 check_grep "workflow is in check-workflows.ts's active whitelist" '"keypool-live-preview.yml"' script/check-workflows.ts
 check_grep "workflow gates on the fork repo, not upstream" "github.repository == 'TEA-ching/kilocode'" .github/workflows/keypool-live-preview.yml
@@ -139,7 +149,7 @@ check_grep "CLI rename also patches the bin/kilo wrapper's hardcoded platform-pa
 check_grep "VSIX rename patches both name and publisher to keypool-code/sctg" '.publisher = "sctg"' .github/workflows/keypool-live-preview.yml
 check_absent "renamed package.json/bin patches are never committed (jq/sed target ephemeral checkout files only)" 'git commit' .github/workflows/keypool-live-preview.yml
 
-# ── 8. Extension Update (About tab — check/install preview builds) ──────────
+# ── 9. Extension Update (About tab — check/install preview builds) ──────────
 check_file "extension-update handler" packages/kilo-vscode/src/kilo-provider/handlers/extension-update.ts
 check_file "host build-date.ts" packages/kilo-vscode/src/utils/build-date.ts
 check_file "webview BuildDate.ts" packages/kilo-vscode/webview-ui/src/config/BuildDate.ts
@@ -152,7 +162,7 @@ check_grep "host and webview BuildDate default to the same placeholder literal" 
 check_grep "webview BuildDate default matches the host's placeholder literal" '1974-05-26T13:00:00Z' packages/kilo-vscode/webview-ui/src/config/BuildDate.ts
 check_grep "CI stamps both BuildDate.ts files from the same sed step" "packages/kilo-vscode/webview-ui/src/config/BuildDate.ts" .github/workflows/keypool-live-preview.yml
 
-# ── 9. kilocode-download (Rust download/update tool) ────────────────────────
+# ── 10. kilocode-download (Rust download/update tool) ────────────────────────
 check_file "kilocode-download crate" packages/kilocode-download/Cargo.toml
 check_file "kilocode-download lib.rs" packages/kilocode-download/src/lib.rs
 check_grep "kilocode-download repo defaults to TEA-ching/kilocode" 'default_value = "TEA-ching/kilocode"' packages/kilocode-download/src/lib.rs
@@ -165,7 +175,7 @@ else
   ok "kilocode-download crate has no package.json (bun workspaces keep skipping it)"
 fi
 
-# ── 10. Backport-agent infra ────────────────────────────────────────────────
+# ── 11. Backport-agent infra ────────────────────────────────────────────────
 check_file "customizations manifest" .backport-agent/customizations.yaml
 check_file "backport-agent config"   .backport-agent/config.json
 check_file "CLAUDE.md (fork-specific Claude Code context)" CLAUDE.md
