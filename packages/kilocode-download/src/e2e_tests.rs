@@ -24,9 +24,9 @@ async fn test_download_cli_for_darwin_x64_e2e() {
     let result = super::main_logic(&args, octocrab).await;
 
     assert!(result.is_ok());
-    assert!(out_dir.join("kilo").exists());
+    assert!(out_dir.join("keypool-code").exists());
 
-    let metadata = fs::metadata(out_dir.join("kilo")).unwrap();
+    let metadata = fs::metadata(out_dir.join("keypool-code")).unwrap();
     assert!(metadata.len() > 0);
 }
 
@@ -76,9 +76,9 @@ async fn test_download_cli_for_linux_arm64_e2e() {
     let result = super::main_logic(&args, octocrab).await;
 
     assert!(result.is_ok());
-    assert!(out_dir.join("kilo").exists());
+    assert!(out_dir.join("keypool-code").exists());
 
-    let metadata = fs::metadata(out_dir.join("kilo")).unwrap();
+    let metadata = fs::metadata(out_dir.join("keypool-code")).unwrap();
     assert!(metadata.len() > 0);
 }
 

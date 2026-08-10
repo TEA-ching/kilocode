@@ -137,20 +137,20 @@ pub struct Args {
     /// Target platform (e.g., win32-x64, darwin-arm64)
     #[arg(long)]
     pub arch: Option<String>,
-    /// Download the CLI (extracted into --out-dir; a directory, not a single file)
+    /// Download the CLI binary and extract it as keypool-code/keypool-code.exe
     #[arg(long, conflicts_with = "vsix")]
     pub cli: bool,
     /// Download the VSIX extension
     #[arg(long, conflicts_with = "cli")]
     pub vsix: bool,
-    /// VSIX output file path (--vsix only); use '-' to write to stdout
+    /// Output file path (--vsix: VSIX; --cli: extracted binary path; use '-' to dump raw archive to stdout for --cli)
     #[arg(long, default_value = "")]
     pub out_file: String,
-    /// CLI extraction directory (--cli only)
+    /// CLI extraction directory (--cli only); binary is written as keypool-code inside it (used when --out-file is not specified)
     #[arg(long, default_value = "")]
     pub out_dir: String,
     /// Update an existing installation (VSIX: replace the file found on disk/PATH; CLI:
-    /// extract on top of the directory containing the existing `kilo` binary)
+    /// extract the binary into the directory containing the existing `keypool-code` binary)
     #[arg(long)]
     pub update: bool,
     /// Enable verbose logging
@@ -204,37 +204,90 @@ pub fn write_output(args: &Args, content: &[u8]) -> Result<(), KilocodeDownloadE
     Ok(())
 }
 
-/// Extracts a downloaded CLI archive (.tar.gz on Linux/macOS, .zip on Windows — see
-/// .github/workflows/keypool-live-preview.yml's release job) into `dest_dir`.
+/// Extracts the CLI binary from a downloaded archive (.tar.gz on Linux/macOS,
+/// .zip on Windows — see .github/workflows/keypool-live-preview.yml's release job)
+/// to `dest_file`.
 ///
-/// The CLI ships as a directory (the `kilo`/`kilo.exe` binary plus the bundled bwrap sandbox
-/// helper, tree-sitter WASM resources, and sandbox worker JS it needs at runtime — see
-/// packages/kilo-vscode/script/build.ts's copy* helpers for the same set of sibling files),
-/// unlike cline's clinepool-download which downloads a single self-contained executable.
-/// That's why kilocode-download extracts into a directory instead of writing one file.
+/// Only the `kilo`/`kilo.exe` binary entry is extracted and written to
+/// `dest_file` (renamed from `kilo`/`kilo.exe`); all other files in the archive
+/// (bwrap, tree-sitter WASM resources, etc.) are skipped.
+///
+/// Dispatches on the `.zip` vs `.tar.gz` suffix of `asset_name` — the archive
+/// format is an artifact of the OS packaging it (zip on Windows, tar.gz elsewhere),
+/// not of the target platform.
 pub fn extract_archive(
     asset_name: &str,
     content: &[u8],
-    dest_dir: &Path,
+    dest_file: &Path,
+    platform: &Platform,
 ) -> Result<(), KilocodeDownloadError> {
-    fs::create_dir_all(dest_dir)?;
+    let source = cli_binary_name(platform);
+
+    if let Some(parent) = dest_file.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
 
     if asset_name.ends_with(".zip") {
         let reader = io::Cursor::new(content);
         let mut archive = zip::ZipArchive::new(reader)
             .map_err(|e| KilocodeDownloadError::ArchiveError(e.to_string()))?;
-        archive
-            .extract(dest_dir)
-            .map_err(|e| KilocodeDownloadError::ArchiveError(e.to_string()))?;
+        let mut found = false;
+        for i in 0..archive.len() {
+            let mut entry = archive
+                .by_index(i)
+                .map_err(|e| KilocodeDownloadError::ArchiveError(e.to_string()))?;
+            let is_match = Path::new(entry.name())
+                .file_name()
+                .and_then(|n| n.to_str())
+                == Some(source);
+            if is_match {
+                let mut outfile = fs::File::create(dest_file)?;
+                io::copy(&mut entry, &mut outfile)?;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(KilocodeDownloadError::FileNotFound(format!(
+                "Binary '{}' not found in archive",
+                source
+            )));
+        }
     } else {
-        // .tar.gz — tar::Archive::unpack preserves Unix permission bits (including the
-        // executable bit on `kilo`/`bwrap`) as stored in the archive by `tar -czf` in CI.
+        // .tar.gz — tar stores Unix permission bits in the header, so we copy
+        // them onto the extracted binary to keep the executable bit on `kilo`.
         let decoder = flate2::read::GzDecoder::new(content);
         let mut archive = tar::Archive::new(decoder);
-        archive.unpack(dest_dir)?;
+        let mut found = false;
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let entry_path = entry.path()?.to_path_buf();
+            if entry_path.file_name().and_then(|n| n.to_str()) == Some(source) {
+                let mut outfile = fs::File::create(dest_file)?;
+                io::copy(&mut entry, &mut outfile)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mode = entry.header().mode().unwrap_or(0o755);
+                    let mut perms = fs::metadata(dest_file)?.permissions();
+                    perms.set_mode(mode);
+                    fs::set_permissions(dest_file, perms)?;
+                }
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(KilocodeDownloadError::FileNotFound(format!(
+                "Binary '{}' not found in archive",
+                source
+            )));
+        }
     }
 
-    info!("Extracted CLI to: {}", dest_dir.display());
+    info!("Extracted {} to: {}", source, dest_file.display());
     Ok(())
 }
 
@@ -298,6 +351,10 @@ fn cli_binary_name(platform: &Platform) -> &'static str {
     if platform.is_windows() { "kilo.exe" } else { "kilo" }
 }
 
+fn keypool_binary_name(platform: &Platform) -> &'static str {
+    if platform.is_windows() { "keypool-code.exe" } else { "keypool-code" }
+}
+
 /// Executes the main logic of the application.
 pub async fn main_logic(args: &Args, octocrab: Octocrab) -> Result<(), KilocodeDownloadError> {
     if !args.cli && !args.vsix {
@@ -338,38 +395,27 @@ pub async fn main_logic(args: &Args, octocrab: Octocrab) -> Result<(), KilocodeD
         .to_vec();
 
     if args.cli {
-        // Raw-archive mode: '--out-file -' or an explicit non-directory --out-file dumps the
-        // downloaded archive as-is instead of extracting it, for scripting/manual use.
+        // Raw-archive mode: '--out-file -' dumps the downloaded archive as-is to
+        // stdout, for scripting/manual use.
         if args.out_file == "-" {
             io::stdout().write_all(&content)?;
             return Ok(());
         }
-        if !args.out_file.is_empty() {
-            let output_path = Path::new(&args.out_file);
-            if let Some(parent) = output_path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
-            }
-            fs::write(output_path, &content)?;
-            info!("Saved raw archive to: {}", output_path.display());
-            return Ok(());
-        }
 
-        let dest_dir = if args.update {
-            let binary_name = cli_binary_name(&platform);
-            let existing_binary = find_existing_file(binary_name)?;
-            existing_binary
-                .parent()
-                .ok_or_else(|| KilocodeDownloadError::PathResolutionError("binary has no parent directory".to_string()))?
-                .to_path_buf()
+        // Determine the output file path for the extracted binary.
+        // Priority: --out-file > --update (find existing) > --out-dir > default (current dir).
+        let dest_file = if !args.out_file.is_empty() {
+            PathBuf::from(&args.out_file)
+        } else if args.update {
+            let binary_name = keypool_binary_name(&platform);
+            find_existing_file(binary_name)?
         } else if args.out_dir.is_empty() {
-            PathBuf::from("./kilocode-cli")
+            PathBuf::from(keypool_binary_name(&platform))
         } else {
-            PathBuf::from(&args.out_dir)
+            PathBuf::from(&args.out_dir).join(keypool_binary_name(&platform))
         };
 
-        extract_archive(&asset.name, &content, &dest_dir)?;
+        extract_archive(&asset.name, &content, &dest_file, &platform)?;
     } else if args.update {
         let target_name = "keypool-code.vsix";
         let existing_path = find_existing_file(target_name)?;

@@ -543,7 +543,7 @@ customizations:
       - "Platform::from_str must keep returning None for 'linux-armhf' — kilocode-download intentionally does not support it (kilocode has no linux-armhf VSIX/CLI target, unlike cline's clinepool-download)."
       - "The 8 Platform variants must stay exactly in sync with packages/kilo-vscode/script/build.ts's VSIX target list — adding/removing a kilocode-vscode build target without updating this enum silently breaks --arch validation for that platform."
       - "extract_archive() must dispatch on the .zip vs .tar.gz suffix of the asset filename, not on the target Platform — the CLI archive format is an artifact of the OS packaging it (zip on Windows, tar.gz elsewhere), not of the platform enum itself."
-      - "--cli must extract into a directory (--out-dir), never write a single file the way --vsix's --out-file does — the CLI's sibling files (bwrap, tree-sitter wasm, sandbox worker js) are required at runtime, not optional."
+      - "--cli extracts only the `kilo`/`kilo.exe` binary (renamed to `keypool-code`/`keypool-code.exe`), skipping sibling files (bwrap, tree-sitter wasm, sandbox worker js); --out-file writes a single binary, --out-dir writes keypool-code into the directory, default (no flag) writes keypool-code in the current directory"
       - "kilocode-download must never be added to the bun workspaces glob (packages/*) with its own package.json — like cline's apps/clinepool-download, it's a Cargo-only crate bun's workspace resolution silently skips when there's no package.json to read; adding one would pull it into bun install/typecheck/lint for no reason."
     tests:
       - "bun run test:invariants"

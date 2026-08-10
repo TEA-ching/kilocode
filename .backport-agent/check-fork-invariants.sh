@@ -167,7 +167,7 @@ check_file "kilocode-download crate" packages/kilocode-download/Cargo.toml
 check_file "kilocode-download lib.rs" packages/kilocode-download/src/lib.rs
 check_grep "kilocode-download repo defaults to TEA-ching/kilocode" 'default_value = "TEA-ching/kilocode"' packages/kilocode-download/src/lib.rs
 check_absent "kilocode-download does not re-add the unsupported linux-armhf platform" 'LinuxArmhf' packages/kilocode-download/src/lib.rs
-check_grep "kilocode-download's CLI mode extracts an archive into a directory, not a single file" "extract_archive" packages/kilocode-download/src/lib.rs
+check_grep "kilocode-download's CLI mode extracts only the kilo binary (renamed to keypool-code), supports --out-file and --out-dir" "extract_archive" packages/kilocode-download/src/lib.rs
 check_grep "kilocode-download shares one platform vocabulary with the VSIX (win32/alpine, not windows/musl)" '"alpine-x64"' packages/kilocode-download/src/lib.rs
 if [ -e packages/kilocode-download/package.json ]; then
   fail "kilocode-download crate has no package.json (must stay a bun-workspace-invisible Cargo-only crate, like cline's apps/clinepool-download)"

@@ -113,9 +113,41 @@ mod tests {
             encoder.finish().unwrap();
         }
 
-        let result = kilocode_download::extract_archive("keypool-code-cli-linux-x64.tar.gz", &gz_bytes, &dir);
+        let dest_file = dir.join("keypool-code");
+        let result = kilocode_download::extract_archive("keypool-code-cli-linux-x64.tar.gz", &gz_bytes, &dest_file, &kilocode_download::Platform::LinuxX64);
         assert!(result.is_ok());
-        assert!(dir.join("kilo").exists());
+        assert!(dest_file.exists());
+        assert_eq!(std::fs::read(&dest_file).unwrap(), b"hello");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_extract_archive_zip() {
+        use std::io::{Cursor, Write};
+        use zip::write::{FileOptions, ZipWriter};
+
+        let dir = std::env::temp_dir().join("kilocode_download_test_extract_zip");
+        std::fs::remove_dir_all(&dir).ok();
+
+        // Build a minimal .zip containing a single "kilo.exe" file in memory.
+        let mut zip_bytes = Vec::new();
+        {
+            let mut writer = ZipWriter::new(Cursor::new(&mut zip_bytes));
+            writer.start_file("kilo.exe", FileOptions::<()>::default()).unwrap();
+            writer.write_all(b"hello").unwrap();
+            writer.finish().unwrap();
+        }
+
+        let dest_file = dir.join("keypool-code.exe");
+        let result = kilocode_download::extract_archive(
+            "keypool-code-cli-win32-x64.zip",
+            &zip_bytes,
+            &dest_file,
+            &kilocode_download::Platform::Win32X64,
+        );
+        assert!(result.is_ok());
+        assert!(dest_file.exists());
+        assert_eq!(std::fs::read(&dest_file).unwrap(), b"hello");
         std::fs::remove_dir_all(&dir).ok();
     }
 
