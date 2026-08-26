@@ -16,7 +16,7 @@ This document will help you set up your development environment and understand h
 Before you begin, make sure you have the following installed:
 
 1. **Git** - For version control
-2. **Bun 1.3.14+** - Required for installing dependencies and running scripts
+2. **Bun 1.4.0+** - Required for installing dependencies and running scripts
 3. **Visual Studio Code** - Our recommended IDE for development
 4. **Java 21** - Required only when running JetBrains plugin checks or repo-level checks that include `@kilocode/kilo-jetbrains`
 
@@ -57,7 +57,7 @@ The full list of recommended extensions is in `.vscode/extensions.json`
 
 AI and coding agents are allowed in this repo. If you use one, start it from the repository root so the root `AGENTS.md` is available, then check package-specific guidance when your change touches a package with its own `AGENTS.md` or contributor docs.
 
-You remain responsible for the submitted work. Before opening a PR, personally review the diff, test the change, make sure you can explain it, and understand how it interacts with the affected package and the rest of the repo. Do not use agents to submit batches of agent-generated, untested, or weakly reviewed PRs. Keep concurrent PRs limited, generally no more than three at a time, and prioritize high-impact issues first. Do not use automation or agents to mass-create issues without human review and prioritization.
+You remain responsible for the submitted work. Before opening a PR, personally review the diff, test the change, make sure you can explain it, and understand how it interacts with the affected package and the rest of the repo. Do not use agents to submit batches of agent-generated, untested, or weakly reviewed PRs. Prioritize high-impact issues first. Do not use automation or agents to mass-create issues without human review and prioritization.
 
 Kilo has bug bounties. To be eligible, make sure your GitHub account is connected in your Kilo account.
 
