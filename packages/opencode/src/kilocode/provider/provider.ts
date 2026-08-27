@@ -19,6 +19,8 @@ import { mapValues, omit, pickBy } from "remeda"
 import { getLastSelectedKeyInfo } from "@/plugin/keypoollive"
 import * as KeypoolUsageDb from "@opencode-ai/core/keypoollive/usage-db"
 import { combinedModelId } from "@opencode-ai/core/keypoollive/types"
+import { reasoningSummary } from "./reasoning-summary"
+import type { Provider } from "@/provider/provider"
 
 /** Default timeout (ms) for provider HTTP requests (connection phase). */
 export const REQUEST_TIMEOUT_MS = 300_000 // 5 minutes
@@ -97,6 +99,39 @@ export function patchConfigModel(cfg: any, existing: any) {
         )
       : {},
   }
+}
+
+const CUSTOM_PROVIDER_PACKAGES = new Set(["@ai-sdk/openai-compatible", "@ai-sdk/openai", "@ai-sdk/anthropic"])
+const FALLBACK_EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"]
+type Variants = NonNullable<Provider.Model["variants"]>
+type Generate = (model: Provider.Model) => Variants
+
+export function customProviderVariants(model: Provider.Model, npm: unknown, generate: Generate): Variants {
+  if (model.variants && Object.keys(model.variants).length > 0) return model.variants
+
+  const supported = typeof npm === "string" && CUSTOM_PROVIDER_PACKAGES.has(npm) && model.api.npm === npm
+  const variants = generate(model)
+  if (Object.keys(variants).length > 0) return variants
+  if (!model.capabilities.reasoning || !supported) return variants
+
+  return Object.fromEntries(
+    FALLBACK_EFFORTS.map((effort) => {
+      if (npm === "@ai-sdk/anthropic") {
+        return [effort, effort === "none" ? { thinking: { type: "disabled" } } : { effort }]
+      }
+      if (npm === "@ai-sdk/openai") {
+        return [
+          effort,
+          {
+            reasoningEffort: effort,
+            reasoningSummary: reasoningSummary(model),
+            include: ["reasoning.encrypted_content"],
+          },
+        ]
+      }
+      return [effort, { reasoningEffort: effort }]
+    }),
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -270,9 +305,7 @@ export function kiloCustomLoaders(dep: CustomDep): Record<string, CustomLoader> 
         options,
         async getModel(sdk: KiloProvider, modelID: string) {
           const provider = input.models[modelID]?.ai_sdk_provider
-          if (provider === "alibaba") return sdk.alibaba(modelID)
           if (provider === "anthropic") return sdk.anthropic(modelID)
-          if (provider === "mistral") return sdk.mistral(modelID)
           if (provider === "openai") return sdk.openai(modelID)
           if (provider === "openai-compatible") return sdk.openaiCompatible(modelID)
           return sdk.languageModel(modelID)
