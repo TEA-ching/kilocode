@@ -406,12 +406,12 @@ jobs:
           - os: ubuntu-26.04-arm
             target: aarch64-unknown-linux-gnu
             arch: arm64
-            family: linux-bookworm
+            family: linux
             ext: ""
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             arch: amd64
-            family: linux
+            family: linux-bookworm
             ext: ""
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
