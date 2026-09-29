@@ -552,6 +552,12 @@ jobs:
           path: release-assets/kilocode-download/
           merge-multiple: true
 
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: kilocode-download-binaries-linux-*
+          path: release-assets/kilocode-download/
+          merge-multiple: true
+
       # Best-effort: only present if DOCKER_USERNAME/DOCKER_PASSWORD are configured on this
       # repo (see build-kilocode-download-for-linux-on-docker). Missing this artifact must
       # not fail the whole release.
