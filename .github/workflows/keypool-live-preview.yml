@@ -384,7 +384,7 @@ jobs:
           path: kilocode-download-binaries/*
           if-no-files-found: error
 
-  build-kilocode-download-for-windows-and-macos:
+  build-kilocode-download-for-windows-linux-and-macos:
     needs: setup
     name: Build kilocode-download ${{ matrix.family }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
@@ -398,6 +398,16 @@ jobs:
             arch: amd64
             family: windows
             ext: .exe
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            arch: amd64
+            family: linux
+            ext: ""
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+            family: linux
+            ext: ""
           - os: macos-latest
             target: aarch64-apple-darwin
             arch: arm64
@@ -457,7 +467,7 @@ jobs:
         setup,
         build-cli,
         build-vscode,
-        build-kilocode-download-for-windows-and-macos,
+        build-kilocode-download-for-windows-linux-and-macos,
       ]
     runs-on: ubuntu-24.04
     if: github.repository == 'TEA-ching/kilocode'
@@ -529,7 +539,7 @@ jobs:
             fi
           done
 
-      - name: Download kilocode-download binaries (windows/macOS — always built)
+      - name: Download kilocode-download binaries (windows/linux/macOS — always built)
         uses: actions/download-artifact@v8
         with:
           pattern: kilocode-download-binaries-windows-*
