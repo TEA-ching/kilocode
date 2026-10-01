@@ -42,9 +42,9 @@
     "models": {
         "provider": "keypoollive",
         "apiKey": "auto",
-        "fast": "mistral/mistral-code-agent-latest",
+        "fast": "poolside/laguna-xs-2.1",
         "_comment_fast": "Orchestrator for the tool loop. Carried over from the cline fork's tuning — generous free tier, reliable in practice.",
-        "specialist": "mistral/devstral-latest",
+        "specialist": "poolside/laguna-s-2.1",
         "_comment_specialist": "Conflict resolution (first attempt).",
         "powerful": "poolside/laguna-s-2.1",
         "_comment_powerful": "Resolution fallback + consensus second opinion. Different vendor from the specialist (mistral) so cross-vendor consensus actually catches doubtful resolutions. Free tier for the user.",
