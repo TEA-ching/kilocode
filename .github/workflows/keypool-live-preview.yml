@@ -489,11 +489,17 @@ jobs:
 
       - name: Generate release notes from recent commits
         run: |
+          # --first-parent: an upstream sync merge shows up as one line instead of listing the
+          # thousands of upstream commits it brings in (GitHub rejects release bodies > 125000 chars).
           PREV=$(git tag --sort=-creatordate --list 'preview/*' | head -1 || true)
           if [ -n "$PREV" ]; then
-            LOG=$(git log --oneline --no-merges --pretty=format:"- %s (%h)" "${PREV}..HEAD")
+            LOG=$(git log --first-parent --pretty=format:"- %s (%h)" "${PREV}..HEAD")
           else
-            LOG=$(git log --oneline --no-merges --pretty=format:"- %s (%h)" -30)
+            LOG=$(git log --first-parent --pretty=format:"- %s (%h)" -30)
+          fi
+          # Hard cap as a second guard, whatever the history looks like.
+          if [ "$(printf '%s\n' "$LOG" | wc -l)" -gt 100 ]; then
+            LOG="$(printf '%s\n' "$LOG" | head -n 100)"$'\n'"- … (older changes truncated)"
           fi
           {
             printf "**Branch:** \`keypool-live\`  **Commit:** \`%s\`\n\n" "${{ github.sha }}"
