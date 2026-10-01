@@ -333,7 +333,18 @@ export const TuiThreadCommand = cmd({
       worker.onerror = (e) => {
         console.error("TUI worker error", e.error ?? e.message)
       }
-      const client = Rpc.client<typeof rpc>(worker)
+      // kilocode_change start - the worker drops RPC requests that arrive before it calls Rpc.listen. A terminal that
+      // answers the theme queries lets the TUI render (and fire its first requests) well before the worker has loaded,
+      // leaving the screen blank forever, so hold every call until the worker reports ready.
+      const raw = Rpc.client<typeof rpc>(worker)
+      const ready = new Promise<void>((resolve) => {
+        const off = raw.on("worker.ready", () => {
+          off()
+          resolve()
+        })
+      })
+      const client: typeof raw = { ...raw, call: ((method, input) => ready.then(() => raw.call(method, input))) as typeof raw.call }
+      // kilocode_change end
       const reload = () => {
         client.call("reload", undefined).catch((err) => console.error("TUI worker reload failed", err))
       }

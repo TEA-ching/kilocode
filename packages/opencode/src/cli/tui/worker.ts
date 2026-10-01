@@ -114,3 +114,6 @@ export const rpc = {
 }
 
 Rpc.listen(rpc)
+// kilocode_change start - requests posted before this module finished loading are dropped, tell the parent we are listening
+Rpc.emit("worker.ready", undefined)
+// kilocode_change end
