@@ -13,6 +13,13 @@ data class SessionDto(
     val time: SessionTimeDto,
     val summary: SessionSummaryDto? = null,
     val revert: SessionRevertDto? = null,
+    val share: SessionShareDto? = null,
+)
+
+/** Public share link for a session. Present only while the session is shared. */
+@Serializable
+data class SessionShareDto(
+    val url: String,
 )
 
 @Serializable
@@ -22,6 +29,8 @@ data class SessionRevertDto(
     val snapshot: String? = null,
     val diff: String? = null,
     val diffs: List<DiffFileDto> = emptyList(),
+    /** Why workspace files were or were not restored: "restored" | "snapshots-disabled" | "unavailable" | "not-a-git-repo". Null for older reverts that predate this field. */
+    val workspace: String? = null,
 )
 
 @Serializable

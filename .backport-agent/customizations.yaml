@@ -351,6 +351,8 @@ customizations:
       show up in the standard picker.
     paths:
       - "packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboard.tsx"
+      - "packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboardButton.tsx"
+      - "packages/kilo-vscode/webview-ui/src/i18n/keypool-live.ts"
       - "packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts"
     related_files:
       - "packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx"
@@ -364,6 +366,9 @@ customizations:
     invariants:
       - "No file under packages/kilo-vscode/ or packages/kilo-ui/ may contain the string `kilocode_change` — checked by `bun run check-kilocode-change` (from packages/kilo-vscode/)."
       - "New webview<->host message types must be added to BOTH webview-messages.ts (or extension-messages.ts) AND their respective union type (WebviewMessage / ExtensionMessage), or the message is silently dropped/untyped."
+      - "KeypoolLiveDashboardButton.tsx must stay a separate component: it calls useDialog(), and PromptInput.tsx itself must not, or every test harness that renders PromptInput without a DialogProvider breaks."
+      - "The fork's i18n strings live in webview-ui/src/i18n/keypool-live.ts (English fallback, spread into every locale file next to cloudProviderDict) — not in en.ts — so the 'every English key exists in all locales' test passes and upstream locale updates don't conflict."
+      - "early-message.ts's exported routeEarlyMessage tries the fork routers first and delegates to routeBaseMessage (upstream's body, complexity cap 20 — do not add branches to it)."
       - "keypoollive-specific webview<->host routing must stay out of packages/kilo-vscode/src/KiloProvider.ts's main dispatch switch (frozen complexity cap, see description) — route it through early-message.ts / handlers/keypoollive.ts instead."
       - "The rotate/dashboard buttons must stay gated on `selectedModel()?.providerID === \"keypoollive\"` — they are meaningless for any other provider."
     tests:

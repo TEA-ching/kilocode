@@ -6,6 +6,14 @@ export type AgentManagerSettingsHandler = SettingsHandler
 export type KiloProviderOptions = {
   /** Context key updated from focus events reported by this provider's webview. */
   focusContext?: string
+  /**
+   * This provider's webview gained focus. Only gains are reported: transient UI
+   * such as the Command Palette blurs the webview, so a `false` report says
+   * nothing about which surface the user considers current.
+   */
+  onFocused?: () => void
+  /** The sidebar view holding this provider was hidden. */
+  onHidden?: () => void
   /** Context keys updated by Agent Manager prompt and terminal focus events. */
   focusTargetContext?: {
     prompt: string
@@ -17,6 +25,7 @@ export type KiloProviderOptions = {
   snapshotInitialization?: "wait"
   slimEditMetadata?: boolean
   tabTitle?: (title: string) => void
+  tabLabel?: string
   worktreeDirectories?: () => string[]
   /**
    * Dynamic root directory override. When present, it replaces the
@@ -26,6 +35,7 @@ export type KiloProviderOptions = {
   rootDirectory?: () => string | undefined
   /** Composite hosts (Agent Manager) own viewed/presence registration themselves. */
   disableViewedRegistration?: boolean
+  disableStatsPolling?: boolean
   /**
    * Project route registry shared by all Agent Manager panels. When set, the
    * provider resolves project-qualified session refs to exact directories and

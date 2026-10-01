@@ -21,6 +21,9 @@ import * as KeypoolUsageDb from "@opencode-ai/core/keypoollive/usage-db"
 import { combinedModelId } from "@opencode-ai/core/keypoollive/types"
 import { reasoningSummary } from "./reasoning-summary"
 import type { Provider } from "@/provider/provider"
+import type { Auth } from "@/auth"
+import type { Config } from "@/config/config"
+import { organization, token } from "./catalog"
 
 /** Default timeout (ms) for provider HTTP requests (connection phase). */
 export const REQUEST_TIMEOUT_MS = 300_000 // 5 minutes
@@ -223,6 +226,24 @@ function recordKeypoolliveError(vaultProviderName: string, modelID: string, erro
   })
 }
 
+export function patchKiloProviderAuth(
+  provider: Provider.Info | undefined,
+  config: Config.Info,
+  info: Auth.Info | undefined,
+) {
+  if (!provider) return
+  const options = config.provider?.kilo?.options
+  const key = token(options, info)
+  const org = organization(options, info)
+  if (key !== undefined) provider.options.kilocodeToken = key
+  if (org !== undefined) provider.options.kilocodeOrganizationId = org
+}
+
+export function publicKiloProvider(provider: Provider.Info): Provider.Info {
+  if (provider.id !== "kilo") return provider
+  return { ...provider, key: undefined, options: omit(provider.options, ["apiKey", "kilocodeToken"]) }
+}
+
 export function kiloCustomLoaders(dep: CustomDep): Record<string, CustomLoader> {
   return {
     keypoollive: () =>
@@ -376,6 +397,24 @@ export function patchCustomLoaderResult(
 export function kiloSmallModelPriority(providerID: string): string[] | undefined {
   if (providerID.startsWith("kilo")) return ["kilo-auto/small"]
   return undefined
+}
+
+/**
+ * True when the user has kilo credentials: a KILO_API_KEY env var, a stored
+ * auth entry, or an apiKey in the kilo provider config. Mirrors the hasKey
+ * check in the kilo custom loader. The kilo provider is autoloaded with an
+ * anonymous key even without credentials, so this gates the cloud
+ * kilo-auto/small fallback to users who can actually reach it.
+ */
+export function hasKiloCredentials(
+  cfg: { provider?: Record<string, { options?: { apiKey?: string } } | null> },
+  auth: unknown,
+  env: Record<string, string | undefined>,
+) {
+  if (env.KILO_API_KEY) return true
+  if (auth) return true
+  if (cfg.provider?.["kilo"]?.options?.apiKey) return true
+  return false
 }
 
 // ---------------------------------------------------------------------------

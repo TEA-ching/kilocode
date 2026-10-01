@@ -127,6 +127,9 @@ check_grep "websearch.ts still lets BYOK EXA_API_KEY win over the vault-rotated 
 
 # ── 6. KeypoolLive webview UI (rotate button, Aggressive Rotation, dashboard) ─
 check_file "KeypoolLiveDashboard component" packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboard.tsx
+check_file "KeypoolLiveDashboardButton component (keeps useDialog out of PromptInput)" packages/kilo-vscode/webview-ui/src/components/chat/KeypoolLiveDashboardButton.tsx
+check_file "keypool-live i18n strings (English fallback for all locales)" packages/kilo-vscode/webview-ui/src/i18n/keypool-live.ts
+check_grep "locales spread keypoolLiveDict" "keypoolLiveDict" packages/kilo-vscode/webview-ui/src/i18n/fr.ts
 check_file "keypoollive webview<->host handler" packages/kilo-vscode/src/kilo-provider/handlers/keypoollive.ts
 check_grep "rotate button gated on keypoollive provider" 'selectedModel()?.providerID === "keypoollive"' packages/kilo-vscode/webview-ui/src/components/chat/PromptInput.tsx
 check_grep "Aggressive Rotation toggle present in ProvidersTab" "aggressiveRotation" packages/kilo-vscode/webview-ui/src/components/settings/ProvidersTab.tsx

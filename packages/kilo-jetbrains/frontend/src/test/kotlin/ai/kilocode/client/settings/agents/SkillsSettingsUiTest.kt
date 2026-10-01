@@ -4,11 +4,14 @@ import ai.kilocode.client.util.edtWait
 import ai.kilocode.client.app.KiloAgentBehaviorService
 import ai.kilocode.client.app.KiloAppService
 import ai.kilocode.client.app.KiloWorkspaceService
+import ai.kilocode.client.plugin.KiloBundle
+import ai.kilocode.client.settings.base.SettingsInfo
 import ai.kilocode.client.settings.base.SettingsPathDialogHandle
 import ai.kilocode.client.testing.FakeAgentBehaviorRpcApi
 import ai.kilocode.client.testing.FakeAppRpcApi
 import ai.kilocode.client.testing.FakeWorkspaceRpcApi
 import ai.kilocode.client.testing.fire
+import ai.kilocode.client.testing.rowLines
 import ai.kilocode.client.ui.list.ActiveListItem
 import ai.kilocode.client.ui.list.activeListCellBounds
 import ai.kilocode.rpc.dto.ConfigDto
@@ -26,7 +29,6 @@ import com.intellij.openapi.ui.TestDialog
 import com.intellij.openapi.ui.TestDialogManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.TitledSeparator
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
@@ -66,6 +68,17 @@ class SkillsSettingsUiTest : BasePlatformTestCase() {
             scope = null
         } finally {
             super.tearDown()
+        }
+    }
+
+    fun `test page shows exactly one info banner explaining skills`() {
+        val panel = panel()
+        flushUntil { rows(panel).size == 3 }
+
+        edt {
+            val info = components(panel).filterIsInstance<SettingsInfo>().single()
+            assertEquals(KiloBundle.message("settings.agentBehavior.skills.info"), bannerIntro(info))
+            true
         }
     }
 
@@ -119,6 +132,16 @@ class SkillsSettingsUiTest : BasePlatformTestCase() {
         }
     }
 
+    fun `test toolbar offers marketplace as final button after separator`() {
+        val panel = panel()
+        flushUntil { rows(panel).size == 3 }
+
+        edt {
+            assertMarketplaceToolbarButton(panel)
+            true
+        }
+    }
+
     fun `test sources section has additional sources title`() {
         val panel = panel()
         flushUntil { sourceRows(panel).size == 2 }
@@ -154,11 +177,10 @@ class SkillsSettingsUiTest : BasePlatformTestCase() {
             val comp = list.cellRenderer.getListCellRendererComponent(list, row, idx, true, true)
             comp.setSize(520, list.fixedCellHeight)
             layout(comp)
-            val title = components(comp).filterIsInstance<SimpleColoredComponent>().single()
-            val labels = components(comp).filterIsInstance<JBLabel>().filter { it.isVisible }.map { it.text }
+            val (title, desc) = rowLines(comp)
 
             assertEquals("plan  $CUSTOM", title.toString())
-            assertTrue(labels.contains("Plan work"))
+            assertEquals("Plan work", desc.toString())
             true
         }
     }
@@ -545,6 +567,11 @@ class SkillsSettingsUiTest : BasePlatformTestCase() {
     }
 
     private fun skillsList(panel: SkillsSettingsUi) = components(panel).filterIsInstance<JBList<ActiveListItem>>().first()
+
+    private fun bannerIntro(info: SettingsInfo): String {
+        val pane = UIUtil.findComponentOfType(info, javax.swing.JEditorPane::class.java) ?: error("no banner text")
+        return pane.text.replace(Regex("<[^>]+>"), "").replace(Regex("\\s+"), " ").trim()
+    }
 
     private fun sourceList(panel: SkillsSettingsUi) = components(panel).filterIsInstance<JBList<ActiveListItem>>().last()
 

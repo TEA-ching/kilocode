@@ -12,20 +12,25 @@ import { useLanguage } from "../src/context/language"
 import { SessionTab } from "../src/components/chat/SessionTab"
 import { SessionTabMenu } from "../src/components/chat/SessionTabMenu"
 import { SortableTabContainer } from "../src/components/chat/TabDnd"
+import type { Activity } from "../src/utils/session-activity"
 import { parseBindingTokens } from "./keybind-tokens"
 
 /** Individual sortable tab wrapper using the `use:sortable` directive. */
 export const SortableTab: Component<{
-  tab: SessionInfo
+  tab: () => SessionInfo
   active: boolean
-  busy: boolean
+  state: Activity
+  stateLabel: string
   keybind?: string
   closeKeybind?: string
   onSelect: () => void
   onMiddleClick: (e: MouseEvent) => void
   onClose: () => void
   onCloseOthers: () => void
+  onCloseToRight?: () => void
   onFork?: () => void
+  pinned?: boolean
+  onTogglePin?: () => void
   role?: "tab"
   selected?: boolean
   tabIndex?: number
@@ -33,12 +38,15 @@ export const SortableTab: Component<{
 }> = (props) => {
   const { t } = useLanguage()
   return (
-    <SortableTabContainer id={props.tab.id}>
+    <SortableTabContainer id={props.tab().id}>
       <SessionTabMenu
         showFork
         onFork={props.onFork}
         onClose={props.onClose}
         onCloseOthers={props.onCloseOthers}
+        onCloseToRight={props.onCloseToRight}
+        pinned={props.pinned}
+        onTogglePin={props.onTogglePin}
         closeShortcut={
           props.closeKeybind ? (
             <span class="am-menu-shortcut">
@@ -50,9 +58,12 @@ export const SortableTab: Component<{
         }
       >
         <SessionTab
-          title={props.tab.title || t("agentManager.session.untitled")}
+          title={props.tab().title || t("agentManager.session.untitled")}
           active={props.active}
-          busy={props.busy}
+          pinned={props.pinned}
+          pinnedLabel={t("agentManager.tab.pinned")}
+          state={props.state}
+          stateLabel={props.stateLabel}
           keybind={props.keybind}
           closeKeybind={props.closeKeybind}
           closeTabIndex={props.active ? 0 : -1}

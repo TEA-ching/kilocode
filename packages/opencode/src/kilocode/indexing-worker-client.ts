@@ -4,6 +4,7 @@ import type {
   VectorStoreSearchResult,
 } from "@kilocode/kilo-indexing/engine"
 import type { IndexingStatus } from "@kilocode/kilo-indexing/status"
+import { zeroID } from "@opencode-ai/core/kilocode/zero-id"
 import { withTimeout } from "@/util/timeout"
 import type { Event, HostRequest, HostResult, Log, Message, Request, Result } from "./indexing-worker-protocol"
 import type { IndexingWarning } from "./indexing-warning"
@@ -200,7 +201,7 @@ export namespace IndexingWorker {
   }
 
   const worker = (directory: string, root: string, hooks: Hooks): Host => {
-    const key = `${directory}\0${root}`
+    const key = zeroID(directory, root)
     const state = channel()
     let active = true
     let callbacks = hooks
@@ -282,7 +283,7 @@ export namespace IndexingWorker {
 
   export function create(directory: string, root: string, hooks: Hooks) {
     if (factory) return factory(directory, root, hooks)
-    const key = `${directory}\0${root}`
+    const key = zeroID(directory, root)
     const existing = pool.get(key)
     if (existing) {
       existing.use(hooks)

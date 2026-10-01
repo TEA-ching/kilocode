@@ -4,9 +4,12 @@ import ai.kilocode.client.util.edtWait
 import ai.kilocode.client.app.KiloAgentBehaviorService
 import ai.kilocode.client.app.KiloAppService
 import ai.kilocode.client.plugin.KiloBundle
+import ai.kilocode.client.settings.base.DirectoryReadyConfigurable
+import ai.kilocode.client.settings.base.SettingsInfo
 import ai.kilocode.client.testing.FakeAgentBehaviorRpcApi
 import ai.kilocode.client.testing.FakeAppRpcApi
 import ai.kilocode.client.testing.fire
+import ai.kilocode.client.testing.rowLines
 import ai.kilocode.client.ui.list.ActiveListItem
 import ai.kilocode.client.ui.list.activeListCellBounds
 import ai.kilocode.rpc.dto.ConfigDto
@@ -22,7 +25,6 @@ import com.intellij.openapi.ui.TestDialog
 import com.intellij.openapi.ui.TestDialogManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import com.intellij.util.ui.UIUtil
@@ -57,6 +59,17 @@ class McpSettingsUiTest : BasePlatformTestCase() {
             scope = null
         } finally {
             super.tearDown()
+        }
+    }
+
+    fun `test page shows exactly one info banner explaining mcp servers`() {
+        val panel = panel()
+        flushUntil { rows(panel).size == 3 }
+
+        edt {
+            val info = components(panel).filterIsInstance<SettingsInfo>().single()
+            assertEquals(KiloBundle.message("settings.agentBehavior.mcp.info"), bannerIntro(info))
+            true
         }
     }
 
@@ -120,12 +133,12 @@ class McpSettingsUiTest : BasePlatformTestCase() {
             val comp = list.cellRenderer.getListCellRendererComponent(list, row, idx, true, true)
             comp.setSize(460, list.fixedCellHeight)
             layout(comp)
-            val labels = components(comp).filterIsInstance<JBLabel>().filter { it.isVisible }.map { it.text }
-            val title = components(comp).filterIsInstance<SimpleColoredComponent>().single()
+            val (title, desc) = rowLines(comp)
             val action = components(comp).filterIsInstance<JBLabel>().single { it.text == "Disconnect" }
 
             assertEquals("bun mcp-files", row.description)
-            assertFalse(labels.contains("bun mcp-files"))
+            assertFalse(desc.isVisible)
+            assertEquals("", desc.toString())
             assertTrue(kotlin.math.abs(centerY(comp, title) - centerY(comp, action)) <= 1)
         }
     }
@@ -296,6 +309,16 @@ class McpSettingsUiTest : BasePlatformTestCase() {
         }
     }
 
+    fun `test toolbar offers marketplace as final button after separator`() {
+        val panel = panel()
+        flushUntil { rows(panel).size == 3 }
+
+        edt {
+            assertMarketplaceToolbarButton(panel)
+            true
+        }
+    }
+
     fun `test failed mcp action shows settings error`() {
         val panel = panel()
         flushUntil { rows(panel).size == 3 }
@@ -403,6 +426,11 @@ class McpSettingsUiTest : BasePlatformTestCase() {
 
     private fun list(panel: McpSettingsUi) = components(panel).filterIsInstance<JBList<ActiveListItem>>().single()
 
+    private fun bannerIntro(info: SettingsInfo): String {
+        val pane = UIUtil.findComponentOfType(info, javax.swing.JEditorPane::class.java) ?: error("no banner text")
+        return pane.text.replace(Regex("<[^>]+>"), "").replace(Regex("\\s+"), " ").trim()
+    }
+
     private fun components(root: java.awt.Component): List<java.awt.Component> {
         val out = mutableListOf<java.awt.Component>()
         fun visit(item: java.awt.Component) {
@@ -472,7 +500,7 @@ class McpSettingsUiTest : BasePlatformTestCase() {
         const val DIR = "/test"
     }
 
-    private class TestConfigurable : AgentBehaviorConfigurableBase<JComponent>() {
+    private class TestConfigurable : DirectoryReadyConfigurable<JComponent>() {
         override fun getId() = "test.mcp"
         override fun getDisplayName() = "test"
         override fun create(cs: CoroutineScope, dir: String): JComponent = McpSettingsUi(cs, DIR)

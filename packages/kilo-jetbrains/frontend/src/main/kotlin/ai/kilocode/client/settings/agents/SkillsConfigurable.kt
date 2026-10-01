@@ -5,9 +5,11 @@ import ai.kilocode.client.app.KiloAgentBehaviorService
 import ai.kilocode.client.app.KiloAppService
 import ai.kilocode.client.app.KiloWorkspaceService
 import ai.kilocode.client.plugin.KiloBundle
-import ai.kilocode.client.settings.base.SettingsContentField
+import ai.kilocode.client.plugin.KiloDocs
+import ai.kilocode.client.settings.base.DirectoryReadyConfigurable
 import ai.kilocode.client.settings.base.SettingsDraftPage
 import ai.kilocode.client.settings.base.SettingsDraftState
+import ai.kilocode.client.settings.base.SettingsInfo
 import ai.kilocode.client.settings.base.SettingsListPanel
 import ai.kilocode.client.settings.base.SettingsMessageException
 import ai.kilocode.client.settings.base.SettingsPathDialog
@@ -15,6 +17,8 @@ import ai.kilocode.client.settings.base.SettingsPathDialogHandle
 import ai.kilocode.client.settings.base.settingsChoosePath
 import ai.kilocode.client.settings.base.settingsContentScroll
 import ai.kilocode.client.settings.base.settingsEditorFileType
+import ai.kilocode.client.settings.marketplace.marketplaceAction
+import ai.kilocode.client.ui.CodeViewField
 import ai.kilocode.client.ui.UiStyle
 import ai.kilocode.client.ui.layout.Stack
 import ai.kilocode.client.ui.list.ActiveListBadge
@@ -33,6 +37,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.EDT
@@ -62,7 +67,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private val edt = Dispatchers.EDT + ModalityState.any().asContextElement()
 
-class SkillsConfigurable : AgentBehaviorConfigurableBase<JComponent>() {
+class SkillsConfigurable : DirectoryReadyConfigurable<JComponent>() {
     override fun getId(): String = ID
     override fun getDisplayName(): String = KiloBundle.message("settings.agentBehavior.skills.displayName")
     override fun create(cs: CoroutineScope, dir: String): JComponent = SkillsSettingsUi(cs, dir)
@@ -139,6 +144,14 @@ internal class SkillsSettingsUi(
     override fun searchPlaceholder() = KiloBundle.message("settings.agentBehavior.skills.search")
 
     override fun emptyText() = KiloBundle.message("settings.agentBehavior.skills.empty")
+
+    override fun tailActions(): List<AnAction> = listOf(marketplaceAction("settings_skills"))
+
+    override fun info(): JComponent = SettingsInfo(
+        KiloBundle.message("settings.agentBehavior.skills.info"),
+        KiloBundle.message("settings.agentBehavior.skills.info.more"),
+        KiloDocs.SKILLS,
+    )
 
     internal fun updateSources(paths: List<String>, urls: List<String>) {
         state.update { copy(sources = SkillsConfigDto(paths = paths, urls = urls)) }
@@ -320,7 +333,7 @@ private fun saved(base: SkillsDraft, draft: SkillsDraft): Boolean = base == draf
 
 internal class SkillEditDialog(private val skill: SkillDto, private val savable: Boolean) : DialogWrapper(true), SkillEditDialogHandle {
     private val base = initial()
-    private val editor = SettingsContentField(base, skillFileType(skill.location, base), savable)
+    private val editor = CodeViewField(base, skillFileType(skill.location, base), savable)
 
     init {
         title = skill.name
