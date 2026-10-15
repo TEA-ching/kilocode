@@ -1,7 +1,6 @@
 import { routeSuggestionWebviewMessage } from "./handlers/suggestion"
 import { routeKeypoolLiveMessage } from "./handlers/keypoollive"
 import { routeExtensionUpdateMessage } from "./handlers/extension-update"
-import * as ModelState from "./model-state"
 import { routeInputToolMessage } from "../services/input-tools"
 import type { KiloConnectionService } from "../services/cli-backend/connection-service"
 import type { SpeechToTextSource } from "../speech-to-text/source"
@@ -119,7 +118,6 @@ async function routeBaseMessage(message: Message, ctx: Ctx): Promise<boolean> {
     return true
   }
   await routeSuggestionWebviewMessage(ctx.question, message)
-  if (await ModelState.handleMessage(message.type, message, ctx.client, ctx.post)) return true
   if (message.type === "exportSessionTranscript") {
     const input = message as { sessionID?: unknown }
     if (typeof input.sessionID === "string") await ctx.exportTranscript(input.sessionID)
