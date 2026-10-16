@@ -42,13 +42,13 @@
     "models": {
         "provider": "keypoollive",
         "apiKey": "auto",
-        "fast": "poolside/laguna-xs-2.1",
+        "fast": "vibe/mistral-vibe-cli-latest",
         "_comment_fast": "Orchestrator for the tool loop. Carried over from the cline fork's tuning — generous free tier, reliable in practice.",
-        "specialist": "poolside/laguna-s-2.1",
+        "specialist": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
         "_comment_specialist": "Conflict resolution (first attempt).",
-        "powerful": "poolside/laguna-s-2.1",
+        "powerful": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
         "_comment_powerful": "Resolution fallback + consensus second opinion. Different vendor from the specialist (mistral) so cross-vendor consensus actually catches doubtful resolutions. Free tier for the user.",
-        "summarizer": "gemini/gemini-3-flash-preview",
+        "summarizer": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
         "_comment_summarizer": "Context compaction with 1M context."
     },
     "ai": {
