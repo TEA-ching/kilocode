@@ -1,7 +1,11 @@
 # kilocode_change - new file
 #
-# Weekly upstream sync of this fork, done by Claude Code (headless). It replaces @sctg/backport-agent; see
+# Upstream sync of this fork, done by Claude Code (headless). It replaces @sctg/backport-agent; see
 # .claude/skills/fork-sync/SKILL.md for the rules the agent follows.
+#
+# There is NO schedule here on purpose: the weekly run is started by the openclaw cron `fork-sync-watch`
+# (sctg-claw repo, scripts/fork-sync/), which dispatches this workflow, follows the run, and sends ONE e-mail
+# per sync. Two triggers would run the agent twice and send a mail for only one of them.
 #
 # Setup (once):
 #   - org or repo secret CLAUDE_CODE_OAUTH_TOKEN_CDVL59 (from `claude setup-token`), visible to this repo only
@@ -11,8 +15,6 @@
 name: fork-sync
 
 on:
-  schedule:
-    - cron: "17 4 * * 1" # every 7 days: Monday 04:17 UTC
   workflow_dispatch:
     inputs:
       mode:
@@ -37,7 +39,7 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'sync' }}
+      MODE: ${{ inputs.mode || 'sync' }}
     steps:
       # The runner context is not available in a job-level env, so the result path is set in a step.
       - name: Result path
@@ -56,7 +58,15 @@ jobs:
 
       - name: Nothing to do
         if: steps.pre.outputs.needs_sync != 'true'
+        env:
+          PRE_REASON: ${{ steps.pre.outputs.reason }}
+          PRE_BEHIND: ${{ steps.pre.outputs.behind }}
         run: |
+          # The cron that started this run reads this file; without it a no-op run would be indistinguishable
+          # from a run that lost its result.
+          jq -n --arg reason "$PRE_REASON" --argjson behind "${PRE_BEHIND:-0}" \
+            '{status: (if $reason == "up-to-date" then "up-to-date" else "skipped" end), reason: $reason, behind: $behind}' \
+            > "$FORK_SYNC_RESULT"
           {
             echo "### fork-sync: nothing to do"
             echo "Reason: \`${{ steps.pre.outputs.reason }}\` (behind ${{ steps.pre.outputs.behind }}, open sync PRs ${{ steps.pre.outputs.open_sync_prs }})."
@@ -168,7 +178,7 @@ jobs:
           exit 1
 
       - name: Upload the agent transcript
-        if: always() && steps.pre.outputs.needs_sync == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fork-sync-${{ github.run_id }}
