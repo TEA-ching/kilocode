@@ -121,11 +121,20 @@ jobs:
         if: always() && steps.pre.outputs.needs_sync == 'true'
         id: result
         run: |
+          # The result file is written by the agent, whose input includes upstream content (untrusted). Its
+          # values reach later steps as expressions, so only strictly shaped values are passed on.
           if [ -s "$FORK_SYNC_RESULT" ] && jq -e . "$FORK_SYNC_RESULT" >/dev/null 2>&1; then
+            status=$(jq -r '.status // "failed"' "$FORK_SYNC_RESULT")
+            branch=$(jq -r '.branch // ""' "$FORK_SYNC_RESULT")
+            pr=$(jq -r '.pr_url // ""' "$FORK_SYNC_RESULT")
+            case "$status" in synced|needs-human|failed|dry-run|up-to-date) ;; *) status=failed ;; esac
+            [[ "$branch" =~ ^sync/upstream-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || branch=""
+            [[ "$pr" =~ ^https://github\.com/TEA-ching/kilocode/pull/[0-9]+$ ]] || pr=""
+            if [ "$status" = synced ] && [ -z "$branch" ]; then status=failed; fi
             {
-              echo "status=$(jq -r '.status // "failed"' "$FORK_SYNC_RESULT")"
-              echo "branch=$(jq -r '.branch // ""' "$FORK_SYNC_RESULT")"
-              echo "pr=$(jq -r '.pr_url // ""' "$FORK_SYNC_RESULT")"
+              echo "status=$status"
+              echo "branch=$branch"
+              echo "pr=$pr"
             } >> "$GITHUB_OUTPUT"
           else
             echo "status=failed" >> "$GITHUB_OUTPUT"
