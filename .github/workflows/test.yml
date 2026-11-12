@@ -24,7 +24,7 @@ jobs:
   # kilocode_change start
   changes:
     name: detect general unit test changes
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     permissions:
       contents: read
       pull-requests: read
@@ -79,7 +79,9 @@ jobs:
       fail-fast: false
       matrix:
         settings: ${{ fromJSON(needs.changes.outputs.settings) }} # kilocode_change
-    runs-on: ${{ matrix.settings.host }}
+    # kilocode_change start - forks have no Blacksmith runners: map the matrix host to a GitHub-hosted one
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && matrix.settings.host || (matrix.settings.os == 'windows' && 'windows-latest' || matrix.settings.os == 'macos' && 'macos-15' || 'ubuntu-latest') }}
+    # kilocode_change end
     timeout-minutes: 45 # kilocode_change
     # kilocode_change start - manual dispatches exist to validate real execution (soak runs,
     # timing measurements); every turbo step in this job bypasses the cache on dispatch
@@ -270,7 +272,7 @@ jobs:
     name: HttpApi exerciser
     needs: changes
     if: needs.changes.outputs.general == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     timeout-minutes: 15
     defaults:
       run:
@@ -325,7 +327,7 @@ jobs:
   # kilocode_change start
   unit-required:
     name: unit (linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     needs:
       - unit
     if: always()
@@ -338,7 +340,7 @@ jobs:
   # kilocode_change start
   required:
     name: test (linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     needs:
       - changes
       - unit
