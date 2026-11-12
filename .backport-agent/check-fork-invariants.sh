@@ -184,6 +184,20 @@ check_file "backport-agent config"   .backport-agent/config.json
 check_file "CLAUDE.md (fork-specific Claude Code context)" CLAUDE.md
 check_grep "CLAUDE.md imports AGENTS.md instead of duplicating it" '@AGENTS.md' CLAUDE.md
 
+# ── 12. Fork-sync agent (weekly upstream sync done by Claude Code) ──────────
+check_file "fork-sync workflow"            .github/workflows/fork-sync.yml
+check_file "fork-sync skill"               .claude/skills/fork-sync/SKILL.md
+check_file "fork-sync deterministic pre-check" script/fork-sync/precheck.sh
+check_grep "fork-sync workflow is in check-workflows.ts's active whitelist" '"fork-sync.yml"' script/check-workflows.ts
+check_grep "fork-sync workflow only runs on the fork repo" "github.repository == 'TEA-ching/kilocode'" .github/workflows/fork-sync.yml
+check_grep "fork-sync uses the dedicated Claude token secret" 'secrets.CLAUDE_CODE_OAUTH_TOKEN_CDVL59' .github/workflows/fork-sync.yml
+check_grep "fork-sync disables commit/PR attribution lines" 'includeCoAuthoredBy' .github/workflows/fork-sync.yml
+check_grep "fork-sync pushes only to sync/upstream-* branches" 'Bash(git push origin sync/upstream-:\*)' .github/workflows/fork-sync.yml
+check_absent "fork-sync never allows an unrestricted git push" 'Bash(git push:\*)' .github/workflows/fork-sync.yml
+check_absent "fork-sync never gives the agent network fetch tools" 'WebFetch\|WebSearch' .github/workflows/fork-sync.yml
+check_grep "fork-sync re-verifies the branch itself instead of trusting the agent" 'Independent verification' .github/workflows/fork-sync.yml
+check_grep "fork-sync protects its own guardrails from the sync branch" 'Guardrails must not be touched' .github/workflows/fork-sync.yml
+
 echo "===================================="
 echo "Invariant checks: $PASS_COUNT passed, $FAIL_COUNT failed"
 exit $FAIL

@@ -586,3 +586,33 @@ customizations:
       - "Every `bun turbo typecheck` invocation in config.json's validation tiers must keep the `--filter='!@kilocode/kilo-jetbrains'` flag. kilo-jetbrains is upstream-shared and outside this fork's scope (no customization here touches it), and its typecheck shells out to Gradle needing a pre-provisioned Java 21 toolchain — an environment dependency the backport-agent host isn't guaranteed to have. Without the filter, a missing/wrong-version Java on the host blocks bulk-merge validation for every pending commit, even ones that never touch kilo-jetbrains (hit in practice: run report.2026-08-07_16-39-27.md, 39 unrelated commits blocked by a Gradle toolchain error). kilo-jetbrains keeps its own typecheck coverage via CI on the sync PR and `packages/kilo-jetbrains/AGENTS.md`'s own gradlew commands."
     tests:
       - "bun run test:invariants"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 9. Fork-sync agent (Claude Code in GitHub Actions)
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: fork-sync-agent
+    description: >
+      The weekly upstream sync, run headless by Claude Code in GitHub Actions. It replaces the
+      @sctg/backport-agent tool: one real `git merge` of upstream/main on a sync/upstream-* branch,
+      generated files regenerated with script/generate.ts, validated by the invariant checker and the
+      typecheck, then a DRAFT pull request. It never merges. A deterministic pre-check
+      (script/fork-sync/precheck.sh) decides whether the agent needs to run at all.
+
+      The workflow is on the check-workflows.ts allow-list. Its guardrails live OUTSIDE the agent: the
+      tool allow-list (no network tools, push only to sync/upstream-*), the independent re-verification,
+      the dry-run cleanliness check, and the check that a sync branch never edits the agent itself.
+    paths:
+      - ".github/workflows/fork-sync.yml"
+      - ".claude/skills/fork-sync/**"
+      - "script/fork-sync/**"
+    related_files:
+      - "script/check-workflows.ts"
+    invariants:
+      - "fork-sync.yml must stay on the check-workflows.ts allow-list and gated on the fork repository."
+      - "The agent's tool allow-list must never include WebFetch/WebSearch or an unrestricted `git push`."
+      - "The workflow, not the agent, must re-run the invariants and the typecheck on the sync branch."
+      - "A sync branch must never modify .claude/skills/fork-sync, fork-sync.yml or script/fork-sync."
+      - "Commits and PR descriptions written by the agent carry no Co-Authored-By or generated-with line."
+    tests:
+      - "bash script/fork-sync/precheck.sh"
+      - "bun run test:invariants"
