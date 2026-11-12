@@ -1302,6 +1302,52 @@ export const kiloScenarios: Scenario[] = [
       object(body)
       check(body.ok === true && body.id === "prt_httpapi_import", "part import should return imported ID")
     }),
+  // keypool-live fork routes. The exerciser clears every KEYPOOL_* variable (script/httpapi-exercise.ts),
+  // so there is no vault and no remote store: usage and errors are empty, rotate and embedding-models are
+  // no-ops, and purge only touches the throwaway XDG data directory.
+  http.protected
+    .get("/keypoollive/usage", "keypoollive.usage")
+    .at((ctx) => ({ path: "/keypoollive/usage", headers: ctx.headers() }))
+    .json(200, (body) => {
+      object(body)
+      check(body.storageMode === "local", "without KEYPOOL_* variables usage must use local storage")
+      array(body.stats)
+      check(body.stats.length === 0, "a throwaway project has no usage records")
+    }),
+  http.protected
+    .get("/keypoollive/errors", "keypoollive.errors")
+    .at((ctx) => ({ path: "/keypoollive/errors", headers: ctx.headers() }))
+    .json(200, (body) => {
+      object(body)
+      check(body.storageMode === "local", "without KEYPOOL_* variables errors must use local storage")
+      array(body.stats)
+      check(body.stats.length === 0, "a throwaway project has no error records")
+    }),
+  http.protected
+    .get("/keypoollive/embedding-models", "keypoollive.embeddingModels")
+    .at((ctx) => ({ path: "/keypoollive/embedding-models", headers: ctx.headers() }))
+    .json(200, (body) => {
+      object(body)
+      array(body.models)
+      check(body.models.length === 0, "no vault is configured, so there are no embedding models")
+    }),
+  http.protected
+    .post("/keypoollive/rotate", "keypoollive.rotate")
+    .mutating()
+    .at((ctx) => ({ path: "/keypoollive/rotate", headers: ctx.headers(), body: { vaultProviderName: "none" } }))
+    .json(200, (body) => {
+      object(body)
+      check(body.rotated === true, "rotate should acknowledge the request")
+      check(body.keyHint === null && body.owner === null, "no vault means no current key to report")
+    }),
+  http.protected
+    .post("/keypoollive/purge", "keypoollive.purge")
+    .mutating()
+    .at((ctx) => ({ path: "/keypoollive/purge", headers: ctx.headers() }))
+    .json(200, (body) => {
+      object(body)
+      check(typeof body.freedBytes === "number" && body.freedBytes >= 0, "purge should report the bytes freed")
+    }),
   // The exerciser runs against a throwaway project directory with no Claude Code
   // or Codex transcripts on the host, so migration correctly finds nothing to do.
   // That is the no-op contract; the import itself is covered by

@@ -4,6 +4,13 @@
 // share SQLite files or on-disk state. Route coverage (missing/extra) stays correct
 // because every child checks it against the full scenario list.
 const args = Bun.argv.slice(2)
+// kilocode_change start - hermetic: the keypool-live routes read KEYPOOL_* to find a vault and a remote
+// usage store. A developer shell commonly has the real ones set, and the purge scenario would then
+// delete real remote data. Drop them before anything else (children inherit this environment).
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith("KEYPOOL_")) delete process.env[name]
+}
+// kilocode_change end
 const shardsIndex = args.indexOf("--shards")
 const shards = shardsIndex === -1 ? 0 : Number(args[shardsIndex + 1])
 
