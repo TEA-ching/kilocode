@@ -1,5 +1,7 @@
 package ai.kilocode.client.agentManager
+import ai.kilocode.client.ui.list.section
 
+import ai.kilocode.client.actions.AgentManagerAddAction
 import ai.kilocode.client.util.edtWait
 import ai.kilocode.client.agentManager.worktree.KiloRunService
 import ai.kilocode.client.agentManager.worktree.KiloWorktreeService
@@ -12,6 +14,41 @@ import ai.kilocode.client.agentManager.worktree.WorktreeController
 import ai.kilocode.client.agentManager.worktree.WorktreeEditorMatcher
 import ai.kilocode.client.agentManager.worktree.WorktreeEditorMatchers
 import ai.kilocode.client.agentManager.worktree.WorktreeIcons
+import ai.kilocode.client.agentManager.hosted.HostedManagementService
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceEditorKind
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceRemoval
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceRow
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceRowData
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceIcons
+import ai.kilocode.client.agentManager.hosted.HostedWorkspaceDataKeys
+import ai.kilocode.client.agentManager.worktree.WorktreeDataKeys
+import ai.kilocode.client.app.KiloHostedService
+import ai.kilocode.client.app.KiloSessionService
+import ai.kilocode.client.testing.FakeSessionRpcApi
+import ai.kilocode.client.testing.TestLog
+import ai.kilocode.client.session.SpinnerIcon
+import ai.kilocode.client.ui.active.ACTIVE_MENU_CELL
+import ai.kilocode.rpc.KiloHostedRpcApi
+import ai.kilocode.rpc.dto.HostedAgentDto
+import ai.kilocode.rpc.dto.HostedCreateWorkspaceDto
+import ai.kilocode.rpc.dto.HostedDeleteResultDto
+import ai.kilocode.rpc.dto.HostedMutationResultDto
+import ai.kilocode.rpc.dto.HostedRepositoryDto
+import ai.kilocode.rpc.dto.HostedWorkspaceDto
+import ai.kilocode.rpc.dto.HostedWorkspaceRefDto
+import ai.kilocode.rpc.dto.HostedWorkspaceListDto
+import ai.kilocode.rpc.dto.HostedWorkspaceStatusDto
+import ai.kilocode.rpc.dto.HostedWorkspaceSessionDto
+import ai.kilocode.rpc.dto.HostedProviderDto
+import ai.kilocode.rpc.dto.HostedSystemEventDto
+import ai.kilocode.rpc.dto.HostedIDs
+import ai.kilocode.rpc.dto.SessionStatusDto
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.DataKey
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import ai.kilocode.client.test.CopyProviderSink
 import ai.kilocode.client.agentManager.worktree.WorktreeNameCache
 import ai.kilocode.client.agentManager.worktree.WorktreeSessionEditorKind
 import ai.kilocode.client.agentManager.worktree.WorktreeStatusService
@@ -32,14 +69,16 @@ import ai.kilocode.client.testing.rowLines
 import ai.kilocode.client.testing.rowTitle
 import ai.kilocode.client.ui.PrIcons
 import ai.kilocode.client.ui.mergeLabel
-import ai.kilocode.client.ui.list.ActiveListBadge
-import ai.kilocode.client.ui.list.ActiveListBadgeCell
-import ai.kilocode.client.ui.list.ActiveListItem
-import ai.kilocode.client.ui.list.ActiveListMetrics
-import ai.kilocode.client.ui.list.ActiveListView
-import ai.kilocode.client.ui.list.ACTIVE_LIST_CHANGES_CELL
-import ai.kilocode.client.ui.list.activeListCellBounds
-import ai.kilocode.client.ui.list.activeListToolWindowBackground
+import ai.kilocode.client.ui.active.ActiveBadge
+import ai.kilocode.client.ui.active.ActiveBadgeCell
+import ai.kilocode.client.ui.active.ActiveItem
+import ai.kilocode.client.ui.active.ActiveMetrics
+import ai.kilocode.client.ui.tree.ActiveEntry
+import ai.kilocode.client.ui.tree.ActiveTreeView
+import ai.kilocode.client.ui.active.activeHitCells
+import ai.kilocode.client.ui.active.activeLayout
+import ai.kilocode.client.ui.active.ACTIVE_CHANGES_CELL
+import ai.kilocode.client.ui.active.activeToolWindowBackground
 import ai.kilocode.client.vfs.KiloPath
 import ai.kilocode.client.vfs.KiloVfsManager
 import ai.kilocode.client.vfs.KiloVirtualFile
@@ -65,18 +104,26 @@ import ai.kilocode.rpc.dto.WorktreeStatsDto
 import ai.kilocode.rpc.dto.WorktreeStatsListDto
 import ai.kilocode.rpc.dto.SessionActivityDto
 import ai.kilocode.rpc.dto.SessionActivityKindDto
+import com.intellij.ide.DataManager
+import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.ide.DeleteProvider
+import com.intellij.openapi.actionSystem.DataProvider
+import com.intellij.openapi.actionSystem.DataSnapshotProvider
+import com.intellij.openapi.actionSystem.DataMap
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.SearchTextField
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.ExpandedItemListCellRendererWrapper
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.IJSwingUtilities
 import com.intellij.util.ui.UIUtil
@@ -88,10 +135,14 @@ import java.awt.event.MouseEvent
 import java.awt.Point
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
+import javax.swing.tree.TreePath
+import com.intellij.util.ui.tree.TreeUtil
 import javax.swing.UIManager
 import javax.swing.plaf.FontUIResource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @Suppress("UnstableApiUsage")
 class AgentManagerPanelTest : BasePlatformTestCase() {
@@ -99,9 +150,12 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
     private lateinit var rpc: FakeWorktreeRpcApi
     private lateinit var service: KiloWorktreeService
     private lateinit var run: FakeRunRpcApi
+    private var delegate: Any? = null
 
     override fun setUp() {
         super.setUp()
+        delegate = UIManager.get("TreeUI")
+        UIManager.put("TreeUI", "com.intellij.ui.tree.ui.DefaultTreeUI")
         installBrowser()
         coroutines = TestCoroutines()
         rpc = FakeWorktreeRpcApi()
@@ -123,6 +177,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
             edt { service<WorktreeNameCache>().clear() }
             coroutines.close(::pump)
         } finally {
+            UIManager.put("TreeUI", delegate)
             super.tearDown()
         }
     }
@@ -138,16 +193,16 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         rpc.beforeCreate = { gate.await() }
         edt { controller.create("feature/y", null) }
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         val pendingId = edt { controller.model.getElementAt(0).id }
-        assertEquals(pendingId, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(pendingId, edt { (selectedValue(list) as ActiveItem).key })
 
         gate.complete(Unit)
         flush()
 
         val created = edt { controller.model.getElementAt(0) }
         assertEquals("feature/y", created.branch)
-        assertEquals(created.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(created.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test creating a worktree opens the created worktree session editor`() {
@@ -157,9 +212,9 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.create("feature/y", null) }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         val created = edt { controller.model.getElementAt(0) }
-        assertEquals(created.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(created.id, edt { (selectedValue(list) as ActiveItem).key })
         val file = edt { FileEditorManager.getInstance(project).openFiles.single() as KiloVirtualFile }
         assertEquals(WorktreeSessionEditorKind.ID, file.path.kind)
         assertEquals(created.path, file.path.params["path"])
@@ -201,6 +256,25 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertTrue(rpc.creates.isEmpty())
     }
 
+    fun `test Add Local opens the existing worktree dialog`() {
+        val order = mutableListOf<String>()
+        val plan = NewWorktreePlan.Create("feature/local", "main", PendingPrompt("build locally"))
+        val controller = WorktreeController(service, "/test", coroutines.scope)
+        val panel = edt {
+            AgentManagerPanel(testRootDisposable, controller, project, dialog = { _, _ -> FakeWorktreeDialog(plan, order) })
+        }
+        val local = AgentManagerAddAction().getChildren(null).first()
+        val context = SimpleDataContext.builder().add(SidePanelKeys.WORKTREE_PANEL, panel).build()
+        val event = AnActionEvent.createFromAnAction(local, null, ActionPlaces.TOOLWINDOW_TITLE, context)
+
+        edt { local.actionPerformed(event) }
+        flush()
+
+        assertEquals(listOf("show"), order)
+        assertEquals("feature/local", rpc.creates.single().branch)
+        assertEquals("main", rpc.creates.single().baseBranch)
+    }
+
     fun `test configure imports an existing branch`() {
         val order = mutableListOf<String>()
         val plan = NewWorktreePlan.Branch("feature/x")
@@ -238,18 +312,32 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertNull(edt { UIUtil.findComponentOfType(panel, SearchTextField::class.java) })
     }
 
+    fun `test local worktrees group has no context menu`() {
+        val controller = WorktreeController(service, "/test", coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller) }
+        val view = tree(panel)
+        layout(view)
+
+        edt {
+            val entry = (0 until view.rowCount)
+                .map { view.getPathForRow(it).lastPathComponent as ActiveEntry }
+                .single { it.allowsChildren }
+            assertFalse(view.showMenu(center(view.bounds(entry)!!), context = true))
+        }
+    }
+
     fun `test worktree list paints tool window background`() {
         val controller = WorktreeController(service, "/test", coroutines.scope)
         val panel = edt { AgentManagerPanel(testRootDisposable, controller) }
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         val scroll = edt { SwingUtilities.getAncestorOfClass(JBScrollPane::class.java, list) as JBScrollPane }
 
-        assertEquals(activeListToolWindowBackground(), edt { panel.background })
-        assertEquals(activeListToolWindowBackground(), edt { list.background })
-        assertEquals(activeListToolWindowBackground(), edt { scroll.background })
-        assertEquals(activeListToolWindowBackground(), edt { scroll.viewport.background })
-        assertEquals(activeListToolWindowBackground(), edt { (scroll.viewport.view as JComponent).background })
+        assertEquals(activeToolWindowBackground(), edt { panel.background })
+        assertEquals(activeToolWindowBackground(), edt { list.background })
+        assertEquals(activeToolWindowBackground(), edt { scroll.background })
+        assertEquals(activeToolWindowBackground(), edt { scroll.viewport.background })
+        assertEquals(activeToolWindowBackground(), edt { (scroll.viewport.view as JComponent).background })
         assertEquals(0, edt { scroll.viewportBorder.getBorderInsets(scroll).top })
     }
 
@@ -261,10 +349,10 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         flush()
 
         @Suppress("UNCHECKED_CAST")
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! as JBList<Any?> }
+        val list = edt { tree(panel) }
         val title = edt {
-            val row = list.model.getElementAt(0) as ActiveListItem
-            val comp = list.cellRenderer.getListCellRendererComponent(list, row, 0, false, false)
+            val row = leafEntry(list, 0).item
+            val comp = rendered(list, leafEntry(list, 0), false, false)
             rowTitle(comp)
         }
         val iter = title.iterator()
@@ -286,10 +374,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        // Worktree rows carry a "Local worktrees" section, so the list keeps fixedCellHeight at -1 and
-        // BasicListUI measures each row from the renderer instead — this is the exact call it makes.
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        assertEquals(-1, edt { list.fixedCellHeight })
+        val list = edt { tree(panel) }
         val before = edt { rowHeight(list) }
         assertTrue("expected a real row height, got $before", before > 0)
 
@@ -322,12 +407,12 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             list.setSize(400, 100)
             list.doLayout()
-            val bounds = list.getCellBounds(0, 0)
-            fire(list, MouseEvent(
+            val bounds = list.let { rowBounds(it, 0) }
+            list.dispatchEvent(MouseEvent(
                 list,
                 MouseEvent.MOUSE_CLICKED,
                 System.currentTimeMillis(),
@@ -362,14 +447,15 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertEquals("repo", current.description)
         assertNull(current.section)
         assertNull(current.metrics)
-        assertEquals("Local worktrees", row(panel, 1).section)
+        assertNull(row(panel, 1).section)
+        assertEquals("Local worktrees", groupTitle(panel))
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             list.setSize(400, 120)
             list.doLayout()
-            val bounds = list.getCellBounds(0, 0)
-            fire(list, MouseEvent(
+            val bounds = list.let { rowBounds(it, 0) }
+            list.dispatchEvent(MouseEvent(
                 list,
                 MouseEvent.MOUSE_CLICKED,
                 System.currentTimeMillis(),
@@ -396,13 +482,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        edt { list.selectedIndex = 1 }
+        val list = edt { tree(panel) }
+        edt { selectLeaf(list, 1) }
 
         edt { controller.reload() }
         flush()
 
-        assertEquals(second.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(second.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test panel refresh keeps selected worktree across tab switch reload`() {
@@ -414,13 +500,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        edt { list.selectedIndex = 1 }
+        val list = edt { tree(panel) }
+        edt { selectLeaf(list, 1) }
 
         edt { panel.refresh() }
         flush()
 
-        assertEquals(second.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(second.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test refresh keeps existing selection`() {
@@ -432,16 +518,16 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(second), focus = true)
-            list.selectedIndex = 0
+            selectLeaf(list, 0)
             panel.refresh()
         }
         flush()
 
-        assertEquals(first.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(first.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test refresh uses active worktree editor when no selection exists`() {
@@ -453,7 +539,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(second), focus = true)
@@ -461,7 +547,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         }
         flush()
 
-        assertEquals(second.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(second.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test selecting worktree editor tab selects its worktree row`() {
@@ -474,14 +560,14 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(second), focus = true)
         }
         pump()
 
-        assertEquals(second.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(second.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test selecting non worktree editor tab clears worktree row selection`() {
@@ -492,19 +578,19 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(item), focus = true)
         }
         pump()
-        assertEquals(item.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(item.id, edt { (selectedValue(list) as ActiveItem).key })
 
         val file = myFixture.addFileToProject("src/Main.kt", "fun main() = Unit").virtualFile
         edt { FileEditorManager.getInstance(project).openFile(file, true) }
         pump()
 
-        assertEquals(-1, edt { list.selectedIndex })
+        assertEquals(-1, edt { selectedLeaf(list) })
     }
 
     fun `test panel starts with no selection when active editor tab is not worktree`() {
@@ -518,8 +604,8 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        assertEquals(-1, edt { list.selectedIndex })
+        val list = edt { tree(panel) }
+        assertEquals(-1, edt { selectedLeaf(list) })
     }
 
     fun `test custom worktree editor matcher can select a row for another editor kind`() {
@@ -536,11 +622,11 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         }
         flush()
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt { FileEditorManager.getInstance(project).openFile(file, true) }
         pump()
 
-        assertEquals(item.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(item.id, edt { (selectedValue(list) as ActiveItem).key })
     }
 
     fun `test deleting a worktree closes and releases its worktree session editor`() {
@@ -578,19 +664,19 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
 
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(b), focus = true)
         }
         pump()
-        assertEquals(b.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(b.id, edt { (selectedValue(list) as ActiveItem).key })
 
         edt { controller.remove(b) }
         flush()
 
-        assertEquals(c.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(c.id, edt { (selectedValue(list) as ActiveItem).key })
         val file = edt { FileEditorManager.getInstance(project).openFiles.single() as KiloVirtualFile }
         assertEquals(c.path, file.path.params["path"])
     }
@@ -604,19 +690,19 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
 
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(b), focus = true)
         }
         pump()
-        assertEquals(b.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(b.id, edt { (selectedValue(list) as ActiveItem).key })
 
         edt { controller.remove(b) }
         flush()
 
-        assertEquals(a.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(a.id, edt { (selectedValue(list) as ActiveItem).key })
         val file = edt { FileEditorManager.getInstance(project).openFiles.single() as KiloVirtualFile }
         assertEquals(a.path, file.path.params["path"])
     }
@@ -630,19 +716,19 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
         edt { controller.reload() }
         flush()
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
 
         edt {
             ensureWorktreeSessionEditorKind()
             project.service<KiloVfsManager>().open(WorktreeSessionEditorKind.ID, worktreeSessionParams(a), focus = true)
         }
         pump()
-        assertEquals(a.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(a.id, edt { (selectedValue(list) as ActiveItem).key })
 
         edt { controller.remove(b) }
         flush()
 
-        assertEquals(a.id, edt { (list.selectedValue as ActiveListItem).key })
+        assertEquals(a.id, edt { (selectedValue(list) as ActiveItem).key })
         val file = edt { FileEditorManager.getInstance(project).openFiles.single() as KiloVirtualFile }
         assertEquals(a.path, file.path.params["path"])
     }
@@ -660,7 +746,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
 
         val row = row(panel, 0)
         assertSame(SessionActivityKind.QUESTION.icon(), row.icon)
-        assertEquals(emptyList<ActiveListBadge>(), row.badges)
+        assertEquals(emptyList<ActiveBadge>(), row.badges)
     }
 
     fun `test worktree row uses the error icon for error activity`() {
@@ -832,7 +918,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         timers.advanceBy(300)
         waitUntil { row(panel, 0).metrics != null || row(panel, 1).metrics != null }
 
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             list.setSize(360, 600)
             list.doLayout()
@@ -884,7 +970,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         timers.advanceBy(300)
         waitUntil { row(panel, 0).metrics != null }
 
-        val metrics: ActiveListMetrics = row(panel, 0).metrics ?: error("expected metrics")
+        val metrics: ActiveMetrics = row(panel, 0).metrics ?: error("expected metrics")
         assertEquals(5, metrics.additions)
         assertEquals(2, metrics.deletions)
         assertEquals(2, metrics.files)
@@ -906,13 +992,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertTrue(row(panel, 0).metrics?.conflict == true)
         // The row's own tooltip is where the mark says what it means: a red crescent alone cannot.
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            val list = view.list
+            val view = tree(panel)
+            val list = view
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
             list.clearSelection()
-            val cell = activeListCellBounds(list, 0, selected = false).getValue(ACTIVE_LIST_CHANGES_CELL)
+            val cell = hitIds(list, 0).getValue(ACTIVE_CHANGES_CELL)
             val point = center(cell)
             val hover = MouseEvent(list, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, point.x, point.y, 0, false)
             val tip = list.getToolTipText(hover) ?: error("expected a tooltip over the changes cell")
@@ -976,15 +1062,15 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertNull(row(panel, 5).metrics)
 
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            view.list.setSize(480, 600)
-            view.list.doLayout()
+            val view = tree(panel)
+            view.setSize(480, 600)
+            view.doLayout()
             UIUtil.dispatchAllInvocationEvents()
             for (index in listOf(0, 1, 2, 3)) {
-                assertTrue(activeListCellBounds(view.list, index, selected = false).containsKey(ACTIVE_LIST_CHANGES_CELL))
+                assertTrue(hitIds(view, index).containsKey(ACTIVE_CHANGES_CELL))
             }
             for (index in listOf(4, 5)) {
-                assertFalse(activeListCellBounds(view.list, index, selected = false).containsKey(ACTIVE_LIST_CHANGES_CELL))
+                assertFalse(hitIds(view, index).containsKey(ACTIVE_CHANGES_CELL))
             }
         }
     }
@@ -1008,11 +1094,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         timers.advanceBy(300)
         flush()
 
+        waitUntil { row(panel, 0).metrics?.action != null }
         edt { row(panel, 0).metrics!!.action!!() }
         waitUntil { opened().isNotEmpty() }
         assertEquals("branch", opened().single().path.params["source"])
         edt { FileEditorManager.getInstance(project).openFiles.forEach { FileEditorManager.getInstance(project).closeFile(it) } }
 
+        waitUntil { row(panel, 1).metrics?.action != null }
         edt { row(panel, 1).metrics!!.action!!() }
         // The local comparison passes no branch, so the tab waits on a branch-name lookup for its title.
         waitUntil { opened().isNotEmpty() }
@@ -1032,14 +1120,15 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         flush()
 
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            val list = view.list
+            val view = tree(panel)
+            val list = view
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
             list.clearSelection()
-            val renderer = list.cellRenderer.getListCellRendererComponent(list, list.model.getElementAt(0), 0, false, true)
-            renderer.setSize(list.width, list.getCellBounds(0, 0).height)
+            val bounds = rowBounds(list, 0)
+            val renderer = rendered(list, leafEntry(list, 0), false, true)
+            renderer.setSize(bounds.width, bounds.height)
             components(renderer).filterIsInstance<Container>().forEach { it.doLayout() }
             assertEquals(
                 listOf("3 files", "-1", "+2"),
@@ -1047,13 +1136,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
                     .map { it.text },
             )
 
-            val point = center(activeListCellBounds(list, 0, selected = false).getValue(ACTIVE_LIST_CHANGES_CELL))
+            val point = center(hitIds(list, 0).getValue(ACTIVE_CHANGES_CELL))
             val hover = MouseEvent(list, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, point.x, point.y, 0, false)
             list.mouseMotionListeners.forEach { it.mouseMoved(hover) }
             assertEquals(Cursor.HAND_CURSOR, list.cursor.type)
             assertEquals(KiloBundle.message("worktree.dirty.tooltip.open"), list.getToolTipText(hover))
             for (id in listOf(MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED, MouseEvent.MOUSE_CLICKED)) {
-                fire(list, MouseEvent(
+                list.dispatchEvent(MouseEvent(
                     list,
                     id,
                     System.currentTimeMillis(),
@@ -1171,17 +1260,17 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         flush()
 
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            val list = view.list
+            val view = tree(panel)
+            val list = view
             list.setSize(480, 320)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
-            val areas = (0..1).associateWith { activeListCellBounds(list, it, selected = false).getValue(ACTIVE_LIST_CHANGES_CELL) }
-            activeListCellBounds(list, 0, selected = true)
+            val areas = (0..1).associateWith { hitIds(list, it).getValue(ACTIVE_CHANGES_CELL) }
+            hitIds(list, 0)
             for (index in listOf(1, 0, 1)) {
                 val point = center(areas.getValue(index))
                 for (id in listOf(MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED, MouseEvent.MOUSE_CLICKED)) {
-                    fire(list, MouseEvent(
+                    list.dispatchEvent(MouseEvent(
                         list,
                         id,
                         System.currentTimeMillis(),
@@ -1299,13 +1388,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertEquals("pull-request", row.secondaryBadges.single().id)
 
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            val list = view.list
+            val view = tree(panel)
+            val list = view
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
             list.clearSelection()
-            val areas = activeListCellBounds(list, 0, selected = false)
+            val areas = hitIds(list, 0)
             val comments = areas.getValue("pr-comments")
             val review = areas.getValue("pr-review")
             val checks = areas.getValue("pr-checks")
@@ -1315,12 +1404,12 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
             assertTrue(kotlin.math.abs(center(comments).y - center(review).y) <= 1)
             assertTrue(kotlin.math.abs(center(review).y - center(checks).y) <= 1)
 
-            val renderer = list.cellRenderer.getListCellRendererComponent(list, row, 0, false, true)
-            renderer.setSize(list.width, list.getCellBounds(0, 0).height)
+            val renderer = rendered(list, leafEntry(list, 0), false, true)
+            renderer.setSize(rowBounds(list, 0).width, rowBounds(list, 0).height)
             components(renderer).filterIsInstance<Container>().forEach { it.doLayout() }
             val title = rowTitle(renderer)
             val header = SwingUtilities.convertPoint(title, 0, 0, renderer)
-            val bounds = list.getCellBounds(0, 0)
+            val bounds = list.let { rowBounds(it, 0) }
             // Line one, clear of the title, and above the PR number on line two.
             assertTrue(comments.x >= bounds.x + header.x + title.width)
             // A column, not a ragged edge: the last glyph ends where the PR pill under it ends, so the
@@ -1376,13 +1465,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val row = row(panel, 0)
 
         edt {
-            val list = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!.list
+            val list = tree(panel)
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
-            val renderer = list.cellRenderer.getListCellRendererComponent(list, row, 0, false, true)
+            val renderer = rendered(list, leafEntry(list, 0), false, true)
             val cell = components(renderer)
-                .filterIsInstance<ActiveListBadgeCell>()
+                .filterIsInstance<ActiveBadgeCell>()
                 .single { it.cellId == "pr-comments" }
 
             // A pill paints its text inside the icon; this one keeps the figure as real label text so the
@@ -1403,13 +1492,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val row = row(panel, 0)
 
         edt {
-            val list = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!.list
+            val list = tree(panel)
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
-            val renderer = list.cellRenderer.getListCellRendererComponent(list, row, 0, true, true)
+            val renderer = rendered(list, leafEntry(list, 0), true, true)
             val cell = components(renderer)
-                .filterIsInstance<ActiveListBadgeCell>()
+                .filterIsInstance<ActiveBadgeCell>()
                 .single { it.cellId == "pr-comments" }
 
             // Selection paints the row blue, so a fixed label foreground would leave the count dark on dark.
@@ -1501,13 +1590,13 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         // The row shows the title, the pill shows the number, and the popup header carries the rest, so
         // repeating any of it here is noise over a badge the user is about to click.
         assertEquals("<html>Click to open the pull request in your browser.</html>", tip)
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
+        val list = edt { tree(panel) }
         edt {
             list.size = java.awt.Dimension(360, 80)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
         }
-        val area = edt { activeListCellBounds(list, 0, selected = false).getValue("pull-request") }
+        val area = edt { hitIds(list, 0).getValue("pull-request") }
 
         assertEquals(tip, edt { list.getToolTipText(MouseEvent(list, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, center(area).x, center(area).y, 0, false)) })
     }
@@ -1550,28 +1639,28 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         flush()
 
         edt {
-            val view = UIUtil.findComponentOfType(panel, ActiveListView::class.java)!!
-            val list = view.list
+            val view = tree(panel)
+            val list = view
             list.setSize(560, 160)
             list.doLayout()
             UIUtil.dispatchAllInvocationEvents()
             list.clearSelection()
-            val row = list.model.getElementAt(0)
+            val row = leafEntry(list, 0).item
             assertTrue(row.leading.isEmpty())
             assertTrue(row.badges.isEmpty())
             assertEquals("#7", row.secondaryBadges.single().text)
             assertEquals("pull-request", row.secondaryBadges.single().id)
-            val areas = activeListCellBounds(list, 0, selected = false)
+            val areas = hitIds(list, 0)
             val badge = areas.getValue("pull-request")
-            val changes = areas.getValue(ACTIVE_LIST_CHANGES_CELL)
-            assertEquals(setOf("pull-request", ACTIVE_LIST_CHANGES_CELL), areas.keys)
-            val renderer = list.cellRenderer.getListCellRendererComponent(list, row, 0, false, true)
-            renderer.setSize(list.width, list.getCellBounds(0, 0).height)
+            val changes = areas.getValue(ACTIVE_CHANGES_CELL)
+            assertEquals(setOf("pull-request", ACTIVE_CHANGES_CELL), areas.keys)
+            val renderer = rendered(list, leafEntry(list, 0), false, true)
+            renderer.setSize(rowBounds(list, 0).width, rowBounds(list, 0).height)
             components(renderer).filterIsInstance<Container>().forEach { it.doLayout() }
             val (title, desc) = rowLines(renderer)
             val origin = SwingUtilities.convertPoint(desc, 0, 0, renderer)
             val header = SwingUtilities.convertPoint(title, 0, 0, renderer)
-            val bounds = list.getCellBounds(0, 0)
+            val bounds = list.let { rowBounds(it, 0) }
             assertTrue(origin.x + desc.width + bounds.x <= changes.x)
             assertTrue(changes.x + changes.width <= badge.x)
             assertTrue(kotlin.math.abs(center(badge).y - center(changes).y) <= 1)
@@ -1586,7 +1675,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
             assertEquals(Cursor.HAND_CURSOR, list.cursor.type)
             assertEquals(row.secondaryBadges.single().tooltip, list.getToolTipText(hover))
             for (id in listOf(MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED, MouseEvent.MOUSE_CLICKED)) {
-                fire(list, MouseEvent(
+                list.dispatchEvent(MouseEvent(
                     list,
                     id,
                     System.currentTimeMillis(),
@@ -1619,9 +1708,9 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val pending = row(panel, 0)
         assertSame(WorktreeIcons.spinner, pending.icon)
         assertEquals(KiloBundle.message("worktree.progress.creating"), pending.progress)
-        assertEquals(emptyList<ActiveListBadge>(), pending.leading)
-        assertEquals(emptyList<ActiveListBadge>(), pending.badges)
-        assertEquals(emptyList<ActiveListBadge>(), pending.secondaryBadges)
+        assertEquals(emptyList<ActiveBadge>(), pending.leading)
+        assertEquals(emptyList<ActiveBadge>(), pending.badges)
+        assertEquals(emptyList<ActiveBadge>(), pending.secondaryBadges)
         assertNull(pending.metrics)
         gate.complete(Unit)
         flush()
@@ -1638,7 +1727,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val view = edt { UIUtil.findComponentOfType(panel, ActiveListView::class.java)!! }
+        val view = edt { tree(panel) }
         layout(view)
         // Display order: current (main) row is index 0, then a (1), b (2).
         edt {
@@ -1663,7 +1752,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val view = edt { UIUtil.findComponentOfType(panel, ActiveListView::class.java)!! }
+        val view = edt { tree(panel) }
         layout(view)
         edt {
             assertTrue(view.select(b.id))
@@ -1684,7 +1773,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val view = edt { UIUtil.findComponentOfType(panel, ActiveListView::class.java)!! }
+        val view = edt { tree(panel) }
         edt {
             assertTrue(view.select(item.id))
             controller.rename(item, "renamed", onFailure = {})
@@ -1692,7 +1781,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         flush()
 
         assertEquals(item.id, edt { view.selected()?.key })
-        assertEquals("renamed", edt { (view.selected() as ActiveListItem).title })
+        assertEquals("renamed", edt { (view.selected() as ActiveItem).title })
     }
 
     fun `test the current and pending rows are not draggable`() {
@@ -1706,7 +1795,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         val gate = CompletableDeferred<Unit>()
         rpc.beforeCreate = { gate.await() }
         edt { controller.create("feature/pending", null) }
-        val view = edt { UIUtil.findComponentOfType(panel, ActiveListView::class.java)!! }
+        val view = edt { tree(panel) }
         layout(view)
 
         edt {
@@ -1730,7 +1819,7 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         edt { controller.reload() }
         flush()
 
-        val view = edt { UIUtil.findComponentOfType(panel, ActiveListView::class.java)!! }
+        val view = edt { tree(panel) }
         layout(view)
         edt {
             view.over(b.id, rowCenter(view, 1))
@@ -1741,6 +1830,700 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         // The optimistic swap is discarded; reload restores the backend (listed) order.
         assertEquals(listOf(a.path, b.path), edt { worktreeIds(controller) })
         assertEquals(listOf(listOf(b.path, a.path)), rpc.reorders.toList())
+    }
+
+    fun `test cloud rows share busy indicators and popup context without reloading or losing selection`() {
+        val ref = HostedWorkspaceRefDto("cloud", "one")
+        val other = HostedWorkspaceRefDto("cloud", "two")
+        val key = HostedIDs.session(ref.providerID, ref.workspaceID, "same")
+        val second = HostedIDs.session(other.providerID, other.workspaceID, "same")
+        val third = HostedIDs.session(other.providerID, other.workspaceID, "sibling")
+        val items = listOf(
+            HostedWorkspaceDto(ref, name = "Cloud one", sessions = listOf(HostedWorkspaceSessionDto(key, "same"))),
+            HostedWorkspaceDto(other, name = "Cloud two", sessions = listOf(
+                HostedWorkspaceSessionDto(second, "same"), HostedWorkspaceSessionDto(third, "sibling"))),
+        )
+        val calls = java.util.concurrent.CopyOnWriteArrayList<String?>()
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?): HostedWorkspaceListDto {
+                calls += repositoryUrl
+                return HostedWorkspaceListDto(items)
+            }
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = items.single { it.ref == ref }
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0, hasActiveTurn = ref == other)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: ai.kilocode.rpc.dto.HostedCreateWorkspaceDto) =
+                ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedDeleteResultDto(ref)
+        }, gate = { true }, log = TestLog(), repo = { "repo" })
+        val sessions = FakeSessionRpcApi()
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, sessions), testRootDisposable)
+        rpc.listed += main()
+        rpc.listed += worktree("aardvark")
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 4 }
+        val view = tree(panel)
+        edt {
+            val cloud = (0 until view.rowCount)
+                .map { view.getPathForRow(it).lastPathComponent as ActiveEntry }
+                .single { it.item.title == KiloBundle.message("worktree.section.cloud") }
+            assertEquals(listOf(ref.key, other.key), (0 until cloud.childCount)
+                .map { (cloud.getChildAt(it) as ActiveEntry).key })
+            assertTrue(view.select(ref.key))
+            val row = row(panel, 2) as HostedWorkspaceRow
+            assertEquals("Active", row.badges.single().text)
+            assertSame(HostedWorkspaceIcons.cloud, row.icon)
+            assertSame(SpinnerIcon.icon, row(panel, 3).icon)
+            assertEquals("Cloud", row.section)
+            val context = context(panel)
+            assertEquals(project, com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT.getData(context))
+            assertEquals(items.first(), HostedWorkspaceDataKeys.WORKSPACE.getData(context))
+            assertNull(WorktreeDataKeys.WORKTREE.getData(context))
+            panel.addNotify()
+            Disposer.register(testRootDisposable) { panel.removeNotify() }
+            layout(view)
+            val point = rowCenter(view, 2)
+            val screen = Point(point)
+            SwingUtilities.convertPointToScreen(screen, view)
+            IdeEventQueue.getInstance().dispatchEvent(MouseEvent(view, MouseEvent.MOUSE_MOVED, 0, 0,
+                point.x, point.y, screen.x, screen.y, 0, false, MouseEvent.NOBUTTON))
+            val menu = hitIds(view, 2).getValue(ACTIVE_MENU_CELL)
+            assertFalse("Cloud rows must render a usable menu glyph", menu.isEmpty)
+            val at = center(menu)
+            val move = MouseEvent(view, MouseEvent.MOUSE_MOVED, 0, 0,
+                at.x, at.y, 0, 0, 0, false, MouseEvent.NOBUTTON)
+            val hit = view.regions.hit(move, enabled = true)
+            assertEquals(ref.key, hit?.entry?.key)
+            assertEquals(ACTIVE_MENU_CELL, hit?.id)
+        }
+        sessions.statuses.value = mapOf(second to SessionStatusDto("idle"))
+        coroutines.drain()
+        edt { assertSame(SpinnerIcon.icon, row(panel, 3).icon) }
+        sessions.statuses.value = mapOf(key to SessionStatusDto("busy"), second to SessionStatusDto("idle"), third to SessionStatusDto("idle"))
+        waitUntil { row(panel, 2).icon === SpinnerIcon.icon && row(panel, 3).icon === HostedWorkspaceIcons.cloud }
+        sessions.activity.value = mapOf(key to SessionActivityDto("/cloud", SessionActivityKindDto.PERMISSION))
+        waitUntil { row(panel, 2).icon === WorktreeIcons.forRow(false, SessionActivityKind.PERMISSION) }
+        sessions.activity.value = emptyMap()
+        sessions.statuses.value = mapOf(key to SessionStatusDto("idle"), second to SessionStatusDto("idle"), third to SessionStatusDto("idle"))
+        waitUntil { row(panel, 2).icon === HostedWorkspaceIcons.cloud }
+        edt {
+            assertEquals(ref.key, view.selected()?.key)
+            assertEquals(1, calls.size)
+            assertTrue(view.select(worktree("aardvark").id))
+            val context = context(panel)
+            assertNull(HostedWorkspaceDataKeys.WORKSPACE.getData(context))
+            assertNotNull(WorktreeDataKeys.WORKTREE.getData(context))
+        }
+    }
+
+    fun `test cloud create without a profile shows a pending row and delete reuses local progress`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        val createGate = CompletableDeferred<Unit>()
+        val deleteGate = CompletableDeferred<Unit>()
+        var createdOnce = false
+        var deleted = false
+        val calls = java.util.concurrent.CopyOnWriteArrayList<String?>()
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?): HostedWorkspaceListDto {
+                calls += repositoryUrl
+                return HostedWorkspaceListDto(if (createdOnce && !deleted) listOf(created) else emptyList())
+            }
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto {
+                assertNull(request.profileID)
+                createGate.await()
+                createdOnce = true
+                return HostedMutationResultDto(workspace = created, session = session)
+            }
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?): HostedDeleteResultDto {
+                deleteGate.await()
+                deleted = true
+                return HostedDeleteResultDto(ref, success = true)
+            }
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000001",
+            messageID = "msg_00000000000100000000000000",
+        )
+        edt { panel.createHosted(request) }
+        flush()
+
+        val view = tree(panel)
+        val pending = edt { selectedValue(view)!! }
+        assertTrue(pending.key.contains(HostedWorkspaceEditorKind.PENDING_PREFIX))
+        assertEquals(KiloBundle.message("hosted.workspace.progress.creating.short"), pending.progress)
+        assertEmpty(pending.badges)
+        val pendingFile = edt { FileEditorManager.getInstance(project).openFiles.single() as KiloVirtualFile }
+        assertEquals(HostedWorkspaceEditorKind.ID, pendingFile.path.kind)
+        assertTrue(pendingFile.path.params[HostedWorkspaceEditorKind.WORKSPACE]!!.startsWith(HostedWorkspaceEditorKind.PENDING_PREFIX))
+
+        createGate.complete(Unit)
+        waitUntil { rows(panel) == 2 && edt { selectedValue(view)?.key } == createdRef.key }
+        waitUntil { calls.size == 2 }
+
+        val removal = project.service<HostedWorkspaceRemoval>()
+        edt { removal.delete(createdRef, project.basePath!!) }
+        waitUntil { (row(panel, 1) as HostedWorkspaceRow).progress == KiloBundle.message("common.deleting") }
+        assertEmpty((row(panel, 1) as HostedWorkspaceRow).badges)
+        assertEquals(2, calls.size)
+
+        deleteGate.complete(Unit)
+        waitUntil { rows(panel) == 1 && calls.size == 3 }
+        // Successful deletion forgets the workspace entirely instead of leaving it in the
+        // persisted exclusion set.
+        assertFalse(project.service<HostedManagementService>().excluded(createdRef))
+    }
+
+    fun `test cloud create keeps its row through a stale discovery`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        val create = CompletableDeferred<Unit>()
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        var createdOnce = false
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?): HostedWorkspaceListDto {
+                val call = calls.incrementAndGet()
+                val listed = createdOnce
+                when (call) {
+                    1 -> first.await()
+                    2 -> second.await()
+                }
+                return HostedWorkspaceListDto(if (listed) listOf(created) else emptyList())
+            }
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto {
+                create.await()
+                createdOnce = true
+                return HostedMutationResultDto(workspace = created, session = session)
+            }
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 && calls.get() == 1 }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000004",
+            messageID = "msg_00000000000400000000000000",
+        )
+        edt { panel.createHosted(request) }
+        val view = tree(panel)
+        assertTrue(edt { selectedValue(view)!!.key }.contains(HostedWorkspaceEditorKind.PENDING_PREFIX))
+
+        create.complete(Unit)
+        waitUntil { rows(panel) == 2 && edt { selectedValue(view)?.key } == createdRef.key }
+
+        first.complete(Unit)
+        waitUntil { calls.get() == 2 }
+        assertEquals(2, rows(panel))
+        assertEquals(createdRef.key, edt { selectedValue(view)?.key })
+
+        second.complete(Unit)
+        waitUntil { rows(panel) == 2 && (row(panel, 1) as HostedWorkspaceRow).data.dto.ref == createdRef }
+        assertEquals(createdRef.key, edt { selectedValue(view)?.key })
+    }
+
+    fun `test cloud create keeps its row when discovery fails`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        var createdOnce = false
+        var fail = false
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?): HostedWorkspaceListDto {
+                calls.incrementAndGet()
+                if (fail) error("discovery failed")
+                return HostedWorkspaceListDto(if (createdOnce) listOf(created) else emptyList())
+            }
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto {
+                createdOnce = true
+                return HostedMutationResultDto(workspace = created, session = session)
+            }
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 && calls.get() == 1 && !hosted.state.value.loading }
+
+        fail = true
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000006",
+            messageID = "msg_00000000000600000000000000",
+        )
+        edt { panel.createHosted(request) }
+        waitUntil { calls.get() == 2 && hosted.state.value.error != null }
+        assertEquals(2, rows(panel))
+
+        fail = false
+        edt { hosted.refresh(project.basePath!!) }
+        waitUntil { hosted.state.value.error == null && hosted.state.value.items.any { it.ref == createdRef } }
+        assertEquals(2, rows(panel))
+        assertEquals(createdRef.key, (row(panel, 1) as HostedWorkspaceRow).data.dto.ref.key)
+    }
+
+    fun `test cloud workspace row uses latest session title`() {
+        val ref = HostedWorkspaceRefDto("cloud", "workspace")
+        val old = HostedWorkspaceSessionDto(
+            id = HostedIDs.session(ref.providerID, ref.workspaceID, "old"),
+            nativeSessionID = "old",
+            title = "Old title",
+            updated = 1.0,
+        )
+        val latest = old.copy(
+            id = HostedIDs.session(ref.providerID, ref.workspaceID, "latest"),
+            nativeSessionID = "latest",
+            title = "OpenRouter API access",
+            updated = 2.0,
+        )
+        val dto = HostedWorkspaceDto(
+            ref = ref,
+            name = "Workspace name",
+            branch = "kilo/branch",
+            sessions = listOf(old, latest),
+        )
+        val row = HostedWorkspaceRow(HostedWorkspaceRowData(dto, null))
+        assertEquals("OpenRouter API access", row.title)
+        assertEquals("kilo/branch", row.description)
+        assertTrue(row.search.contains("OpenRouter API access"))
+    }
+
+    fun `test hosted rows participate in the platform delete action`() {
+        val ref = HostedWorkspaceRefDto("cloud", "one")
+        val key = HostedIDs.session(ref.providerID, ref.workspaceID, "same")
+        val item = HostedWorkspaceDto(
+            ref,
+            name = "Cloud one",
+            sessions = listOf(HostedWorkspaceSessionDto(key, "same")),
+        )
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto(listOf(item))
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = item
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(
+                ref: HostedWorkspaceRefDto,
+                sessionID: String,
+                organizationID: String?,
+            ): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto) =
+                ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun startWorkspaceSession(
+                ref: HostedWorkspaceRefDto,
+                request: ai.kilocode.rpc.dto.HostedStartSessionDto,
+            ) = ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref)
+        }, gate = { true }, log = TestLog(), repo = { "repo" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(
+            KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()),
+            testRootDisposable,
+        )
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        val view = tree(panel)
+        waitUntil { edt { view.select(ref.key) } }
+
+        val context = edt { DataManager.getInstance().getDataContext(panel) }
+        val sink = edt { DeleteProviderSink().also { panel.uiDataSnapshot(it) } }
+        val provider = sink.provider
+        assertNotNull(provider)
+        assertTrue(edt { provider!!.canDeleteElement(context) })
+    }
+
+    fun `test booting cloud workspace shows the shared running spinner`() {
+        val ref = HostedWorkspaceRefDto("cloud", "booting")
+        val item = HostedWorkspaceDto(ref, name = "Cloud booting")
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto(listOf(item))
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = item
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "starting", "sandbox_starting", 100.0)
+            override suspend fun systemEvents(
+                ref: HostedWorkspaceRefDto,
+                sessionID: String,
+                organizationID: String?,
+            ): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto) =
+                ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun startWorkspaceSession(
+                ref: HostedWorkspaceRefDto,
+                request: ai.kilocode.rpc.dto.HostedStartSessionDto,
+            ) = ai.kilocode.rpc.dto.HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref)
+        }, gate = { true }, log = TestLog(), repo = { "repo" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(
+            KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()),
+            testRootDisposable,
+        )
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil {
+            leaves(tree(panel)).any { (it.item as? HostedWorkspaceRow)?.data?.dto?.ref == ref }
+        }
+
+        val row = leaves(tree(panel)).map { it.item }.filterIsInstance<HostedWorkspaceRow>()
+            .single { it.data.dto.ref == ref }
+        // Starting is work in progress; the row wears the same spinner local running sessions use.
+        assertSame(SpinnerIcon.icon, row.icon)
+        assertEquals("Starting", row.badges.single().text)
+    }
+
+    fun `test cloud create is retired after repeated successful omissions`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            id = HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            nativeSessionID = "root",
+            title = "OpenRouter API access",
+            updated = 2.0,
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto().also { calls.incrementAndGet() }
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto =
+                HostedMutationResultDto(workspace = created, session = session)
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 && calls.get() == 1 && !hosted.state.value.loading }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000007",
+            messageID = "msg_00000000000700000000000000",
+        )
+        edt { panel.createHosted(request) }
+        waitUntil { rows(panel) == 2 && calls.get() == 2 && !hosted.state.value.loading }
+        assertEquals("OpenRouter API access", (row(panel, 1) as HostedWorkspaceRow).title)
+
+        repeat(5) {
+            val count = calls.get()
+            edt { hosted.refresh(project.basePath!!) }
+            waitUntil { calls.get() > count && !hosted.state.value.loading }
+        }
+        assertEquals(2, rows(panel))
+
+        repeat(HOSTED_MISS_LIMIT - 1 - 5) {
+            val count = calls.get()
+            edt { hosted.refresh(project.basePath!!) }
+            waitUntil { calls.get() > count && !hosted.state.value.loading }
+        }
+        waitUntil { rows(panel) == 1 }
+    }
+
+    fun `test deleting a created workspace that discovery has not listed removes its row`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto()
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto =
+                HostedMutationResultDto(workspace = created, session = session)
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000005",
+            messageID = "msg_00000000000500000000000000",
+        )
+        edt { panel.createHosted(request) }
+        waitUntil { rows(panel) == 2 }
+
+        edt { project.service<HostedWorkspaceRemoval>().delete(createdRef, project.basePath!!) }
+        waitUntil { rows(panel) == 1 }
+    }
+
+    fun `test deleting a discovered workspace hides it before discovery catches up`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "discovered")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Discovered", sessions = listOf(session))
+        var createdOnce = false
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto(if (createdOnce) listOf(created) else emptyList())
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto {
+                createdOnce = true
+                return HostedMutationResultDto(workspace = created, session = session)
+            }
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000006",
+            messageID = "msg_00000000000600000000000000",
+        )
+        edt { panel.createHosted(request) }
+        waitUntil { rows(panel) == 2 && hosted.state.value.items.any { it.ref == createdRef } }
+
+        edt { project.service<HostedWorkspaceRemoval>().delete(createdRef, project.basePath!!) }
+        waitUntil { rows(panel) == 1 }
+    }
+
+    fun `test signing out clears created and pending cloud rows`() {
+        val createdRef = HostedWorkspaceRefDto("cloud", "created")
+        val session = HostedWorkspaceSessionDto(
+            HostedIDs.session(createdRef.providerID, createdRef.workspaceID, "root"),
+            "root",
+        )
+        val created = HostedWorkspaceDto(createdRef, name = "Created", sessions = listOf(session))
+        var gate = CompletableDeferred<Unit>().apply { complete(Unit) }
+        var createdOnce = false
+        var signedOut = false
+        val hosted = KiloHostedService(coroutines.scope, object : KiloHostedRpcApi {
+            override suspend fun providers(): List<HostedProviderDto> = emptyList()
+            override suspend fun workspaces(repositoryUrl: String?, cursor: String?, organizationID: String?) =
+                HostedWorkspaceListDto(if (createdOnce && !signedOut) listOf(created) else emptyList(), signedOut = signedOut)
+            override suspend fun workspace(ref: HostedWorkspaceRefDto, sessionCursor: String?, organizationID: String?) = created
+            override suspend fun workspaceStatus(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedWorkspaceStatusDto(ref, "active", "active", "sandbox_ready", 100.0)
+            override suspend fun systemEvents(ref: HostedWorkspaceRefDto, sessionID: String, organizationID: String?): Flow<HostedSystemEventDto> = emptyFlow()
+            override suspend fun workspaceProfiles(organizationID: String?) =
+                ai.kilocode.rpc.dto.HostedWorkspaceProfileListDto()
+            override suspend fun setPersonalDefaultProfile(profileID: String) =
+                ai.kilocode.rpc.dto.HostedProfileDefaultDto(success = true)
+            override suspend fun createWorkspace(request: HostedCreateWorkspaceDto): HostedMutationResultDto {
+                gate.await()
+                createdOnce = true
+                return HostedMutationResultDto(workspace = created, session = session)
+            }
+            override suspend fun startWorkspaceSession(ref: HostedWorkspaceRefDto, request: ai.kilocode.rpc.dto.HostedStartSessionDto) =
+                HostedMutationResultDto()
+            override suspend fun deleteWorkspace(ref: HostedWorkspaceRefDto, organizationID: String?) =
+                HostedDeleteResultDto(ref, success = true)
+        }, gate = { true }, log = TestLog(), repo = { "https://github.com/kilo-org/example" })
+        project.replaceService(KiloHostedService::class.java, hosted, testRootDisposable)
+        project.replaceService(KiloSessionService::class.java,
+            KiloSessionService(project, coroutines.scope, FakeSessionRpcApi()), testRootDisposable)
+        rpc.listed += main()
+        val controller = WorktreeController(service, project.basePath!!, coroutines.scope)
+        val panel = edt { AgentManagerPanel(testRootDisposable, controller, project) }
+        edt { controller.reload() }
+        waitUntil { rows(panel) == 1 }
+
+        val request = HostedCreateWorkspaceDto(
+            repository = HostedRepositoryDto("github", repo = "kilo-org/example"),
+            profileID = "profile",
+            prompt = "Build it",
+            agent = HostedAgentDto("code", "kilo/kilo-auto/free"),
+            operationKey = "00000000-0000-4000-8000-000000000002",
+            messageID = "msg_00000000000200000000000000",
+        )
+        edt { panel.createHosted(request) }
+        waitUntil { rows(panel) == 2 }
+
+        signedOut = true
+        edt { hosted.refresh(project.basePath!!) }
+        waitUntil { rows(panel) == 1 }
+
+        signedOut = false
+        edt { hosted.refresh(project.basePath!!) }
+        waitUntil { rows(panel) == 2 }
+
+        gate = CompletableDeferred()
+        edt { panel.createHosted(request.copy(operationKey = "00000000-0000-4000-8000-000000000003")) }
+        waitUntil { rows(panel) == 3 }
+        signedOut = true
+        edt { hosted.refresh(project.basePath!!) }
+        waitUntil { rows(panel) == 1 }
+    }
+
+    private fun context(panel: AgentManagerPanel): DataContext {
+        val values = mutableMapOf<String, Any>()
+        panel.uiDataSnapshot(object : CopyProviderSink() {
+            override fun <T : Any> set(key: DataKey<T>, data: T?) {
+                if (data != null) values[key.name] = data
+            }
+        })
+        return DataContext { values[it] }
     }
 
     private fun prs(
@@ -1781,18 +2564,27 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         return panel
     }
 
+    private class DeleteProviderSink : DataSink {
+        var provider: DeleteProvider? = null
+
+        override fun <T : Any> set(key: DataKey<T>, data: T?) {
+            if (key == PlatformDataKeys.DELETE_ELEMENT_PROVIDER) provider = data as? DeleteProvider
+        }
+
+        override fun <T : Any> setNull(key: DataKey<T>) {}
+        override fun <T : Any> lazyNull(key: DataKey<T>) {}
+        override fun <T : Any> lazyValue(key: DataKey<T>, data: (DataMap) -> T?) {}
+        override fun uiDataSnapshot(provider: UiDataProvider) = provider.uiDataSnapshot(this)
+        override fun dataSnapshot(provider: DataSnapshotProvider) = provider.dataSnapshot(this)
+        override fun uiDataSnapshot(provider: DataProvider) {}
+    }
+
     private fun main(): WorktreeDto {
         val base = project.basePath!!
         return WorktreeDto(base, "repo", "main", base, main = true)
     }
 
-    /** The preferred height BasicListUI itself measures for row 0 when fixedCellHeight is -1. */
-    @Suppress("UNCHECKED_CAST")
-    private fun rowHeight(rawList: JBList<*>): Int {
-        val list = rawList as JBList<Any?>
-        val renderer = ExpandedItemListCellRendererWrapper.unwrap(list.cellRenderer)
-        return renderer.getListCellRendererComponent(list, list.model.getElementAt(0), 0, false, false).preferredSize.height
-    }
+    private fun rowHeight(tree: ActiveTreeView): Int = rowBounds(tree, 0).height
 
     private fun worktree(name: String): WorktreeDto {
         val path = "${project.basePath!!}/.kilo/worktrees/$name"
@@ -1803,17 +2595,87 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         return (0 until controller.model.size).map { controller.model.getElementAt(it).path }
     }
 
-    private fun layout(view: ActiveListView) {
+    private fun layout(view: ActiveTreeView) {
         edt {
-            view.list.setSize(360, 600)
-            view.list.doLayout()
+            (view.parent as? javax.swing.JViewport)?.setSize(360, 600)
+            view.setSize(360, 600)
+            view.doLayout()
+            TreeUtil.invalidateCacheAndRepaint(view.ui as? javax.swing.plaf.TreeUI)
             UIUtil.dispatchAllInvocationEvents()
         }
     }
 
-    private fun rowCenter(view: ActiveListView, index: Int): Point {
-        val bounds = view.list.getCellBounds(index, index)!!
+    private fun rowCenter(view: ActiveTreeView, index: Int): Point {
+        val bounds = rowBounds(view, index)
         return Point(bounds.x + 8, bounds.y + bounds.height / 2)
+    }
+
+    private fun tree(panel: AgentManagerPanel): ActiveTreeView =
+        edt { UIUtil.findComponentOfType(panel, ActiveTreeView::class.java)!! }
+
+    private fun selectedValue(tree: ActiveTreeView): ActiveItem? =
+        (tree.selectionPath?.lastPathComponent as? ActiveEntry)?.item
+
+    private fun rendered(
+        tree: ActiveTreeView,
+        entry: ActiveEntry,
+        selected: Boolean = false,
+        focused: Boolean = true,
+    ): java.awt.Component =
+        tree.cellRenderer.getTreeCellRendererComponent(tree, entry, selected, true, false, 0, focused)
+
+    private fun groupTitle(panel: AgentManagerPanel): String {
+        val tree = tree(panel)
+        return edt {
+            (0 until tree.rowCount).mapNotNull {
+                tree.getPathForRow(it)?.lastPathComponent as? ActiveEntry
+            }.first { it.allowsChildren }.item.title
+        }
+    }
+
+    private fun leaves(tree: ActiveTreeView): List<ActiveEntry> =
+        edt {
+            (0 until tree.rowCount).mapNotNull {
+                tree.getPathForRow(it)?.lastPathComponent as? ActiveEntry
+            }.filter { !it.allowsChildren }
+        }
+
+    private fun leafEntry(tree: ActiveTreeView, index: Int): ActiveEntry = leaves(tree)[index]
+
+    private fun leafRow(tree: ActiveTreeView, index: Int): Int =
+        edt { tree.getRowForPath(TreePath(leafEntry(tree, index).path)) }
+
+    /**
+     * Row rectangle the renderer is laid out at. It is the tree cell minus the shared outer gutter,
+     * which is what the tree itself paints and what a list cell gives its own renderer.
+     */
+    private fun rowBounds(tree: ActiveTreeView, index: Int): java.awt.Rectangle =
+        edt {
+            (tree.parent as? javax.swing.JViewport)?.setSize(tree.width, tree.height)
+            tree.regions.cell(leafEntry(tree, index))
+        }
+
+    private fun selectLeaf(tree: ActiveTreeView, index: Int) {
+        edt { tree.selectionModel.selectionPath = TreePath(leafEntry(tree, index).path) }
+    }
+
+    private fun selectedLeaf(tree: ActiveTreeView): Int =
+        edt {
+            val selected = tree.selectionPath?.lastPathComponent as? ActiveEntry ?: return@edt -1
+            leaves(tree).indexOfFirst { it.key == selected.key }
+        }
+
+    private fun hitIds(tree: ActiveTreeView, index: Int): Map<String, java.awt.Rectangle> {
+        val entry = leafEntry(tree, index)
+        edt { (tree.parent as? javax.swing.JViewport)?.setSize(tree.width.coerceAtLeast(360), tree.height.coerceAtLeast(600)) }
+        val bounds = edt { tree.regions.cell(entry) }
+        val selected = edt { tree.selectionModel.isPathSelected(TreePath(entry.path)) }
+        val comp = edt {
+            tree.cellRenderer.getTreeCellRendererComponent(tree, entry, selected, true, false, 0, true)
+        }
+        comp.setSize(bounds.width, bounds.height)
+        activeLayout(comp)
+        return activeHitCells(comp, bounds.x, bounds.y).associate { it.id to it.bounds }
     }
 
     private fun <T> edt(block: () -> T): T = edtWait(block)
@@ -1824,15 +2686,9 @@ class AgentManagerPanelTest : BasePlatformTestCase() {
         assertTrue(coroutines.pumpUntil { edt(block) })
     }
 
-    private fun row(panel: AgentManagerPanel, idx: Int): ActiveListItem {
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        return edt { list.model.getElementAt(idx) as ActiveListItem }
-    }
+    private fun row(panel: AgentManagerPanel, idx: Int): ActiveItem = leafEntry(tree(panel), idx).item
 
-    private fun rows(panel: AgentManagerPanel): Int {
-        val list = edt { UIUtil.findComponentOfType(panel, JBList::class.java)!! }
-        return edt { list.model.size }
-    }
+    private fun rows(panel: AgentManagerPanel): Int = leaves(tree(panel)).size
 
     private fun components(root: Component): List<Component> {
         val out = mutableListOf<Component>()

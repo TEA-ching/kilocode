@@ -57,6 +57,51 @@ export interface IndexingErrorTelemetryProperties extends IndexingTelemetryPrope
   maxRetries?: number
 }
 
+/** One explicit MCP sign-in attempt admitted by the CLI runtime. Never carries server names, URLs, or OAuth secrets. */
+export interface McpAuthStartedProperties extends Record<string, unknown> {
+  schemaVersion: number
+  attemptId: string
+  /** The client opens the authorization URL itself (editors, console) instead of the CLI process. */
+  external: boolean
+}
+
+export interface McpAuthCompletedProperties extends McpAuthStartedProperties {
+  outcome: "success" | "failure" | "denied" | "cancelled" | "timeout" | "superseded" | "interrupted"
+  phase:
+    | "prepare"
+    | "callback_setup"
+    | "authorization"
+    | "token_exchange"
+    | "credential_store"
+    | "reconnect"
+    | "tool_discovery"
+  oauthOutcome: "success" | "failure" | "not_performed" | "not_reached"
+  connectionOutcome: "connected" | "failed" | "needs_auth" | "needs_client_registration" | "not_attempted"
+  errorCode?: string
+  redirect: boolean
+  durationMs: number
+  /** `verified` only when the effective config matches a public marketplace MCP method. */
+  attribution: "verified" | "unknown"
+  itemType?: "mcp"
+  itemId?: string
+  methodId?: string
+  methodName?: string
+  oauthRequirement?: string
+  authHandler?: string
+}
+
+/** One marketplace item installed into, or removed from, one config scope. Never carries parameter values. */
+export interface MarketplaceItemProperties extends Record<string, unknown> {
+  itemId: string
+  itemType: string
+  itemName?: string
+  target: "project" | "global"
+  /** `custom` when `KILO_MARKETPLACE_BASE_URL` points at a non-public catalog. */
+  catalog: "public" | "custom"
+  hasParameters?: boolean
+  installationMethodName?: string
+}
+
 export namespace Telemetry {
   let initialized = false
   let startTime = 0
@@ -290,6 +335,23 @@ export namespace Telemetry {
 
   export function trackMcpServerError(server: string, error?: string) {
     track(TelemetryEvent.MCP_SERVER_ERROR, { server, error })
+  }
+
+  export function trackMcpAuthStarted(properties: McpAuthStartedProperties) {
+    track(TelemetryEvent.MCP_AUTH_STARTED, properties)
+  }
+
+  export function trackMcpAuthCompleted(properties: McpAuthCompletedProperties) {
+    track(TelemetryEvent.MCP_AUTH_COMPLETED, properties)
+  }
+
+  // Marketplace
+  export function trackMarketplaceItemInstalled(properties: MarketplaceItemProperties) {
+    track(TelemetryEvent.MARKETPLACE_ITEM_INSTALLED, properties)
+  }
+
+  export function trackMarketplaceItemRemoved(properties: MarketplaceItemProperties) {
+    track(TelemetryEvent.MARKETPLACE_ITEM_REMOVED, properties)
   }
 
   // Remote

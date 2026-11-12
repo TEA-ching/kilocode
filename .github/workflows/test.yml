@@ -24,7 +24,7 @@ jobs:
   # kilocode_change start
   changes:
     name: detect general unit test changes
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     permissions:
       contents: read
       pull-requests: read
@@ -58,6 +58,7 @@ jobs:
         id: matrix
         env:
           GENERAL: ${{ github.event_name != 'pull_request' || steps.filter.outputs.general == 'true' }}
+          REPOSITORY: ${{ github.repository }} # kilocode_change
         run: |
           if [ "$GENERAL" != "true" ]; then
             echo 'general=false' >> "$GITHUB_OUTPUT"
@@ -68,7 +69,14 @@ jobs:
           # kilocode_change - Windows runs 6 shards at KILO_TEST_CONCURRENCY=2. Measured: a
           # 5-shard matrix was worse on both wall-clock (slowest job 9.3m vs 6.7m) and machine
           # minutes (43 vs 37) — with 2 workers per shard, packing more work per shard loses.
-          echo 'settings=[{"os":"linux","index":1,"total":2,"host":"blacksmith-4vcpu-ubuntu-2404","run":true,"packages":true,"pty":true},{"os":"linux","index":2,"total":2,"host":"blacksmith-4vcpu-ubuntu-2404","run":true,"packages":false,"pty":false},{"os":"macos","index":1,"total":1,"host":"macos-15","run":true,"packages":true,"pty":true},{"os":"windows","index":1,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":true,"pty":true},{"os":"windows","index":2,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":3,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":4,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":5,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":6,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false}]' >> "$GITHUB_OUTPUT"
+          settings='[{"os":"linux","index":1,"total":2,"host":"blacksmith-4vcpu-ubuntu-2404","run":true,"packages":true,"pty":true},{"os":"linux","index":2,"total":2,"host":"blacksmith-4vcpu-ubuntu-2404","run":true,"packages":false,"pty":false},{"os":"macos","index":1,"total":1,"host":"macos-15","run":true,"packages":true,"pty":true},{"os":"windows","index":1,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":true,"pty":true},{"os":"windows","index":2,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":3,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":4,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":5,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false},{"os":"windows","index":6,"total":6,"host":"blacksmith-4vcpu-windows-2025","run":true,"packages":false,"pty":false}]'
+          # kilocode_change start - forks have no Blacksmith Windows runners; the GitHub-hosted ones are slower and
+          # put the checkout on D: and temp on C:, which the suite is not calibrated for. Keep Linux and macOS.
+          if [ "$REPOSITORY" != 'Kilo-Org/kilocode' ]; then
+            settings=$(jq -c 'map(select(.os != "windows"))' <<< "$settings")
+          fi
+          # kilocode_change end
+          echo "settings=$settings" >> "$GITHUB_OUTPUT"
   # kilocode_change end
   unit:
     # kilocode_change start
@@ -79,7 +87,9 @@ jobs:
       fail-fast: false
       matrix:
         settings: ${{ fromJSON(needs.changes.outputs.settings) }} # kilocode_change
-    runs-on: ${{ matrix.settings.host }}
+    # kilocode_change start - forks have no Blacksmith runners: map the matrix host to a GitHub-hosted one
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && matrix.settings.host || (matrix.settings.os == 'windows' && 'windows-latest' || matrix.settings.os == 'macos' && 'macos-15' || 'ubuntu-latest') }}
+    # kilocode_change end
     timeout-minutes: 45 # kilocode_change
     # kilocode_change start - manual dispatches exist to validate real execution (soak runs,
     # timing measurements); every turbo step in this job bypasses the cache on dispatch
@@ -270,7 +280,7 @@ jobs:
     name: HttpApi exerciser
     needs: changes
     if: needs.changes.outputs.general == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     timeout-minutes: 15
     defaults:
       run:
@@ -325,7 +335,7 @@ jobs:
   # kilocode_change start
   unit-required:
     name: unit (linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     needs:
       - unit
     if: always()
@@ -338,7 +348,7 @@ jobs:
   # kilocode_change start
   required:
     name: test (linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     needs:
       - changes
       - unit

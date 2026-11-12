@@ -50,15 +50,17 @@ export async function routeKeypoolLiveMessage(
       ctx.post({ type: "keypoolLiveRotateError", requestID, vaultProviderName, error: "Not connected to CLI backend" })
       return true
     }
-      await ctx.client.keypoollive
-        .rotate({ directory: ctx.dir, vaultProviderName }, { throwOnError: true })
-        .then((response) => ctx.post({ 
-          type: "keypoolLiveRotated", 
-          requestID, 
+    await ctx.client.keypoollive
+      .rotate({ directory: ctx.dir, vaultProviderName }, { throwOnError: true })
+      .then((response) =>
+        ctx.post({
+          type: "keypoolLiveRotated",
+          requestID,
           vaultProviderName,
           keyHint: response.data.keyHint,
-          owner: response.data.owner
-        }))
+          owner: response.data.owner,
+        }),
+      )
       .catch((error: unknown) =>
         ctx.post({
           type: "keypoolLiveRotateError",

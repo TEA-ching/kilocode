@@ -230,7 +230,9 @@ const KeypoolLiveDashboard: Component = () => {
                         <td style={{ padding: "4px 8px" }}>{row.keyHint}</td>
                         <td style={{ padding: "4px 8px", "text-align": "right" }}>{row.totalRequests}</td>
                         <td style={{ padding: "4px 8px", "text-align": "right" }}>{row.errorCount}</td>
-                        <td style={{ padding: "4px 8px", "text-align": "right" }}>{(row.errorRate * 100).toFixed(1)}%</td>
+                        <td style={{ padding: "4px 8px", "text-align": "right" }}>
+                          {(row.errorRate * 100).toFixed(1)}%
+                        </td>
                         <td style={{ padding: "4px 8px", "text-align": "right" }}>{row.lastErrorCode ?? "—"}</td>
                       </tr>
                     )}
