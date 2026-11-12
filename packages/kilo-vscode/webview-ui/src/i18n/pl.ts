@@ -334,6 +334,7 @@ export const dict = {
   "ui.permission.toolLabel.todoRead": "Odczyt Todo",
   "ui.permission.toolLabel.todoWrite": "Zapis Todo",
   "ui.permission.toolLabel.codeSearch": "Wyszukiwanie kodu",
+  "ui.permission.toolLabel.browserOpen": "Zintegrowana przeglądarka",
   "ui.permission.copyCommand": "Kopiuj",
   "ui.approval.auto": "Zatwierdzono automatycznie",
   "ui.approval.manual": "Zatwierdzone przez Ciebie",
@@ -570,6 +571,7 @@ export const dict = {
   "settings.permissions.tool.webfetch.description": "Pobieranie zawartości z adresu URL",
   "settings.permissions.tool.websearch.description": "Przeszukiwanie sieci",
   "settings.permissions.tool.codesearch.description": "Przeszukiwanie kodu w sieci",
+  "settings.permissions.tool.browser_open.description": "Otwórz stronę w zintegrowanej przeglądarce",
   "settings.permissions.tool.external_directory.description": "Dostęp do plików poza katalogiem projektu",
   "settings.permissions.tool.doom_loop.description": "Wykrywanie powtarzających się wywołań narzędzi (doom loop)",
 
@@ -727,6 +729,11 @@ export const dict = {
 
   "session.messages.welcome":
     "Kilo Code to asystent programowania AI. Poproś go o tworzenie funkcji, naprawę błędów lub wyjaśnienie bazy kodu.",
+  "session.workspaceScope.description":
+    "Czat Kilo używa tylko „{{folder}}”, pierwszego folderu w tym obszarze roboczym.",
+  "session.workspaceScope.alternatives":
+    "Aby pracować z innym folderem, otwórz go w osobnym oknie lub dodaj go jako projekt w Agent Manager.",
+  "session.workspaceScope.dismiss": "Ukryj wskazówkę dotyczącą zakresu obszaru roboczego",
   "session.messages.scrollToBottom": "Przewiń na dół",
   "session.messages.initializing": "Inicjalizacja...",
   "session.messages.taskStarting": "Uruchamianie...",
@@ -933,6 +940,9 @@ export const dict = {
   "settings.experimental.conversationPromptHistory.title": "Historia promptów dla każdej rozmowy",
   "settings.experimental.conversationPromptHistory.description":
     "Przechowuj historię promptów (ArrowUp/ArrowDown) osobno dla każdej rozmowy zamiast współdzielić jedną historię we wszystkich rozmowach.",
+  "settings.experimental.agentManagerSplash.title": "Ekran powitalny Agent Manager",
+  "settings.experimental.agentManagerSplash.description":
+    "Wypróbuj nowe wprowadzenie do Agent Manager z przykładami przepływów pracy. Zmiany są stosowane natychmiast.",
   "settings.experimental.claudeMigration.title": "Migracja Claude Code",
   "settings.experimental.claudeMigration.description":
     "Jednorazowo importuj obsługiwane globalne instrukcje CLAUDE.md, proste umiejętności i wyłączone definicje MCP. Oryginalne pliki Claude pozostają niezmienione; po włączeniu uruchom ponownie backend.",
@@ -1183,6 +1193,8 @@ export const dict = {
   "settings.autoApprove.tool.webfetch": "Pobieranie URL. Pozwala na pobieranie zawartości z określonego adresu URL.",
   "settings.autoApprove.tool.websearch":
     "Przeszukiwanie sieci. Pozwala na wykonywanie zewnętrznych wyszukiwań w sieci.",
+  "settings.autoApprove.tool.browser_open":
+    "Otwieraj strony w zintegrowanej przeglądarce. To podgląd w aplikacji, a nie automatyzacja Playwright.",
   "settings.autoApprove.tool.external_directory":
     "Dostęp do plików poza obszarem roboczym. Uruchamiane przy dostępie do plików poza bieżącym katalogiem projektu.",
   "settings.autoApprove.tool.doom_loop":

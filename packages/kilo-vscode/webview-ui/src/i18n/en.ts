@@ -327,6 +327,7 @@ export const dict = {
   "ui.permission.toolLabel.todoRead": "Todo Read",
   "ui.permission.toolLabel.todoWrite": "Todo Write",
   "ui.permission.toolLabel.codeSearch": "Code Search",
+  "ui.permission.toolLabel.browserOpen": "Integrated Browser",
   "ui.permission.copyCommand": "Copy",
   "ui.approval.auto": "Auto-approved",
   "ui.approval.manual": "Approved by you",
@@ -520,6 +521,7 @@ export const dict = {
   "settings.permissions.tool.todowrite.description": "Update the todo list",
   "settings.permissions.tool.webfetch.description": "Fetch content from a URL",
   "settings.permissions.tool.websearch.description": "Search the web",
+  "settings.permissions.tool.browser_open.description": "Open a page in the Integrated Browser",
   "settings.permissions.tool.codesearch.description": "Search code on the web",
   "settings.permissions.tool.external_directory.description": "Access files outside the project directory",
   "settings.permissions.tool.doom_loop.description": "Detect repeated tool calls with identical input",
@@ -712,6 +714,10 @@ export const dict = {
 
   "session.messages.welcome":
     "Kilo Code is an AI coding assistant. Ask it to build features, fix bugs, or explain your codebase.",
+  "session.workspaceScope.description": "Kilo chat uses only “{{folder}}”, the first folder in this workspace.",
+  "session.workspaceScope.alternatives":
+    "To work with another folder, open it in its own window or add it as a project in Agent Manager.",
+  "session.workspaceScope.dismiss": "Dismiss workspace scope hint",
   "session.messages.scrollToBottom": "Scroll to bottom",
   "session.messages.initializing": "Initializing...",
   "session.messages.taskStarting": "Starting...",
@@ -970,6 +976,9 @@ export const dict = {
   "settings.experimental.conversationPromptHistory.title": "Per-Conversation Prompt History",
   "settings.experimental.conversationPromptHistory.description":
     "Keep the prompt input history (ArrowUp/ArrowDown recall) separate for each conversation instead of sharing one history across all conversations.",
+  "settings.experimental.agentManagerSplash.title": "Agent Manager splash",
+  "settings.experimental.agentManagerSplash.description":
+    "Try the new Agent Manager introduction with workflow examples. Applies immediately.",
   "settings.experimental.claudeMigration.title": "Claude Code Migration",
   "settings.experimental.claudeMigration.description":
     "On the next backend start, import supported global CLAUDE.md instructions, simple skills, and disabled MCP definitions. This runs once with no automatic retry; global Claude instructions and skills are then handed off to Kilo. Claude files stay unchanged; keep them if you still use Claude Code.",
@@ -1167,6 +1176,8 @@ export const dict = {
   "settings.autoApprove.tool.todoreadwrite": "Manage task list. Allows reading and updating the internal task list.",
   "settings.autoApprove.tool.webfetch": "Fetch a URL. Allows retrieving content from a specific URL.",
   "settings.autoApprove.tool.websearch": "Search the web. Allows performing external web searches.",
+  "settings.autoApprove.tool.browser_open":
+    "Open pages in the Integrated Browser. This is the in-app preview, not Playwright browser automation.",
   "settings.autoApprove.tool.doom_loop":
     "Prevent repeated identical actions. Triggered when the same tool call repeats with identical input.",
 

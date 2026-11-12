@@ -120,6 +120,11 @@ export interface WorkspaceDirectoryChangedMessage {
   directory: string
 }
 
+export interface WorkspaceScopeMessage {
+  type: "workspaceScope"
+  folder?: { name: string; path: string }
+}
+
 export interface LanguageChangedMessage {
   type: "languageChanged"
   locale: string
@@ -519,6 +524,7 @@ export interface ChatSettingsLoadedMessage {
   type: "chatSettingsLoaded"
   settings: {
     shiftTabCyclesVariant: boolean
+    agentManagerSplash: boolean
     browserAutomation: boolean
     agentManagerBrowserOpenLinksIn: "external" | "integrated"
     workspaceTrusted: boolean
@@ -1907,6 +1913,7 @@ export type ExtensionMessage =
   | BrowserTabFrameMessage
   | BrowserTabCursorMessage
   | ReadyMessage
+  | WorkspaceScopeMessage
   | FontSizeChangedMessage
   | GitStatusMessage
   | ConnectionStateMessage

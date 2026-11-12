@@ -12,15 +12,15 @@ description: "Complete reference for all Kilo CLI commands and subcommands"
 ```
 start ACP (Agent Client Protocol) server
 
-Options:
-  --help         Show help  [boolean]
-  --version      Show version number  [boolean]
-  --port         port to listen on  [number] [default: 0]
-  --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-  --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-  --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-  --cors         additional domains to allow for CORS  [array] [default: []]
-  --cwd          working directory  [string] [default: "."]
+Options :
+  --help         Affiche l'aide  [booléen]
+  --version      Affiche le numéro de version  [booléen]
+  --port         port to listen on  [nombre] [défaut : 0]
+  --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+  --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+  --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+  --cors         additional domains to allow for CORS  [tableau] [défaut : []]
+  --cwd          working directory  [chaîne de caractères] [défaut : "."]
 ```
 
 ## kilo mcp
@@ -28,16 +28,16 @@ Options:
 ```
 manage MCP (Model Context Protocol) servers
 
-Commands:
+Commandes :
   kilo mcp add [name]     add an MCP server
-  kilo mcp list           list MCP servers and their status  [aliases: ls]
+  kilo mcp list           list MCP servers and their status  [alias : ls]
   kilo mcp auth [name]    authenticate with an OAuth-enabled MCP server
   kilo mcp logout [name]  remove OAuth credentials for an MCP server
   kilo mcp debug <name>   debug OAuth connection for an MCP server
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo mcp add
@@ -46,14 +46,14 @@ Options:
 add an MCP server
 
 Positionals:
-  name  name of the MCP server  [string]
+  --name  name of the MCP server  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --url      URL for a remote MCP server  [string]
-  --env      environment variable for a local MCP server (KEY=VALUE)  [array]
-  --header   HTTP header for a remote MCP server (KEY=VALUE)  [array]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --url      URL for a remote MCP server  [chaîne de caractères]
+  --env      environment variable for a local MCP server (KEY=VALUE)  [tableau]
+  --header   HTTP header for a remote MCP server (KEY=VALUE)  [tableau]
 ```
 
 ### kilo mcp list
@@ -61,9 +61,9 @@ Options:
 ```
 list MCP servers and their status
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo mcp auth
@@ -71,15 +71,15 @@ Options:
 ```
 authenticate with an OAuth-enabled MCP server
 
-Commands:
-  kilo mcp auth list  list OAuth-capable MCP servers and their auth status  [aliases: ls]
+Commandes :
+  kilo mcp auth list  list OAuth-capable MCP servers and their auth status  [alias : ls]
 
 Positionals:
-  name  name of the MCP server  [string]
+  --name  name of the MCP server  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo mcp auth list
@@ -87,9 +87,9 @@ Options:
 ```
 list OAuth-capable MCP servers and their auth status
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo mcp logout
@@ -98,11 +98,11 @@ Options:
 remove OAuth credentials for an MCP server
 
 Positionals:
-  name  name of the MCP server  [string]
+  --name  name of the MCP server  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo mcp debug
@@ -111,11 +111,11 @@ Options:
 debug OAuth connection for an MCP server
 
 Positionals:
-  name  name of the MCP server  [string]
+  --name  name of the MCP server  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo [project]
@@ -124,28 +124,28 @@ Options:
 start kilo tui
 
 Positionals:
-  project  path to start kilo in  [string]
+      --project  path to start kilo in  [chaîne de caractères]
 
-Options:
-      --help          Show help  [boolean]
-      --version       Show version number  [boolean]
-      --port          port to listen on  [number] [default: 0]
-      --hostname      hostname to listen on  [string] [default: "127.0.0.1"]
-      --mdns          enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-      --mdns-domain   custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-      --cors          additional domains to allow for CORS  [array] [default: []]
-  -m, --model         model to use in the format of provider/model  [string]
-  -c, --continue      continue the last session  [boolean]
-  -s, --session       session id to continue  [string]
-      --fork          fork the session when continuing (use with --continue or --session)  [boolean]
-      --cloud-fork    fetch session from cloud and continue locally (use with --session)  [boolean]
-      --worktree      create (or reuse) a git worktree with this name and start kilo there  [string]
-      --prompt        prompt to use  [string]
-      --agent         agent to use  [string]
-      --auto          auto-approve permissions that are not explicitly denied (dangerous!)  [boolean] [default: false]
-      --mini          start the minimal interactive interface  [boolean] [default: false]
-      --no-replay     disable mini session history replay on resume and after resize  [boolean]
-      --replay-limit  cap visible mini replay to the newest N messages  [number]
+Options :
+      --help          Affiche l'aide  [booléen]
+      --version       Affiche le numéro de version  [booléen]
+      --port          port to listen on  [nombre] [défaut : 0]
+      --hostname      hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+      --mdns          enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+      --mdns-domain   custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+      --cors          additional domains to allow for CORS  [tableau] [défaut : []]
+  -m, --model         model to use in the format of provider/model  [chaîne de caractères]
+  -c, --continue      continue the last session  [booléen]
+  -s, --session       session id to continue  [chaîne de caractères]
+      --fork          fork the session when continuing (use with --continue or --session)  [booléen]
+      --cloud-fork    fetch session from cloud and continue locally (use with --session)  [booléen]
+      --worktree      create (or reuse) a git worktree with this name and start kilo there  [chaîne de caractères]
+      --prompt        prompt to use  [chaîne de caractères]
+      --agent         agent to use  [chaîne de caractères]
+      --auto          auto-approve permissions that are not explicitly denied (dangerous!)  [booléen] [défaut : false]
+      --mini          start the minimal interactive interface  [booléen] [défaut : false]
+      --no-replay     disable mini session history replay on resume and after resize  [booléen]
+      --replay-limit  cap visible mini replay to the newest N messages  [nombre]
 ```
 
 ## kilo attach
@@ -154,21 +154,21 @@ Options:
 attach to a running kilo server
 
 Positionals:
-  url  http://localhost:4096  [string]
+      --url  http://localhost:4096  [chaîne de caractères]
 
-Options:
-      --help          Show help  [boolean]
-      --version       Show version number  [boolean]
-      --dir           directory to run in  [string]
-  -c, --continue      continue the last session  [boolean]
-  -s, --session       session id to continue  [string]
-      --fork          fork the session when continuing (use with --continue or --session)  [boolean]
-      --cloud-fork    fetch session from cloud and continue locally (use with --session)  [boolean]
-  -p, --password      basic auth password (defaults to KILO_SERVER_PASSWORD)  [string]
-  -u, --username      basic auth username (defaults to KILO_SERVER_USERNAME or 'kilo')  [string]
-      --mini          start the minimal interactive interface  [boolean] [default: false]
-      --no-replay     disable mini session history replay on resume and after resize  [boolean]
-      --replay-limit  cap visible mini replay to the newest N messages  [number]
+Options :
+      --help          Affiche l'aide  [booléen]
+      --version       Affiche le numéro de version  [booléen]
+      --dir           directory to run in  [chaîne de caractères]
+  -c, --continue      continue the last session  [booléen]
+  -s, --session       session id to continue  [chaîne de caractères]
+      --fork          fork the session when continuing (use with --continue or --session)  [booléen]
+      --cloud-fork    fetch session from cloud and continue locally (use with --session)  [booléen]
+  -p, --password      basic auth password (defaults to KILO_SERVER_PASSWORD)  [chaîne de caractères]
+  -u, --username      basic auth username (defaults to KILO_SERVER_USERNAME or 'kilo')  [chaîne de caractères]
+      --mini          start the minimal interactive interface  [booléen] [défaut : false]
+      --no-replay     disable mini session history replay on resume and after resize  [booléen]
+      --replay-limit  cap visible mini replay to the newest N messages  [nombre]
 ```
 
 ## kilo run
@@ -177,31 +177,31 @@ Options:
 run kilo with a message
 
 Positionals:
-  message  message to send  [string] [default: []]
+      --message  message to send  [chaîne de caractères] [défaut : []]
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-      --command      the command to run, use message for args  [string]
-  -c, --continue     continue the last session  [boolean]
-  -s, --session      session id to continue  [string]
-      --fork         fork the session before continuing (requires --continue or --session)  [boolean]
-      --cloud-fork   fetch session from cloud and continue locally (use with --session)  [boolean]
-      --share        share the session  [boolean]
-  -m, --model        model to use in the format of provider/model  [string]
-      --agent        agent to use  [string]
-      --format       format: default (formatted) or json (raw JSON events)  [string] [choices: "default", "json"] [default: "default"]
-  -f, --file         file(s) to attach to message  [array]
-      --title        title for the session (uses truncated prompt if no value provided)  [string]
-      --attach       attach to a running kilo server (e.g., http://localhost:4096)  [string]
-  -p, --password     basic auth password (defaults to KILO_SERVER_PASSWORD)  [string]
-  -u, --username     basic auth username (defaults to KILO_SERVER_USERNAME or 'kilo')  [string]
-      --dir          directory to run in, path on remote server if attaching  [string]
-      --port         port for the local server (defaults to random port if no value provided)  [number]
-      --variant      model variant (provider-specific reasoning effort, e.g., high, max, minimal)  [string]
-      --thinking     show thinking blocks  [boolean]
-  -i, --interactive  run in direct interactive split-footer mode  [boolean] [default: false]
-      --auto         auto-approve permissions that are not explicitly denied (dangerous!)  [boolean] [default: false]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+      --command      the command to run, use message for args  [chaîne de caractères]
+  -c, --continue     continue the last session  [booléen]
+  -s, --session      session id to continue  [chaîne de caractères]
+      --fork         fork the session before continuing (requires --continue or --session)  [booléen]
+      --cloud-fork   fetch session from cloud and continue locally (use with --session)  [booléen]
+      --share        share the session  [booléen]
+  -m, --model        model to use in the format of provider/model  [chaîne de caractères]
+      --agent        agent to use  [chaîne de caractères]
+      --format       format: default (formatted) or json (raw JSON events)  [chaîne de caractères] [choix : "default", "json"] [défaut : "default"]
+  -f, --file         file(s) to attach to message  [tableau]
+      --title        title for the session (uses truncated prompt if no value provided)  [chaîne de caractères]
+      --attach       attach to a running kilo server (e.g., http://localhost:4096)  [chaîne de caractères]
+  -p, --password     basic auth password (defaults to KILO_SERVER_PASSWORD)  [chaîne de caractères]
+  -u, --username     basic auth username (defaults to KILO_SERVER_USERNAME or 'kilo')  [chaîne de caractères]
+      --dir          directory to run in, path on remote server if attaching  [chaîne de caractères]
+      --port         port for the local server (defaults to random port if no value provided)  [nombre]
+      --variant      model variant (provider-specific reasoning effort, e.g., high, max, minimal)  [chaîne de caractères]
+      --thinking     show thinking blocks  [booléen]
+  -i, --interactive  run in direct interactive split-footer mode  [booléen] [défaut : false]
+      --auto         auto-approve permissions that are not explicitly denied (dangerous!)  [booléen] [défaut : false]
 ```
 
 ## kilo debug
@@ -209,7 +209,7 @@ Options:
 ```
 debugging and troubleshooting tools
 
-Commands:
+Commandes :
   kilo debug config        show resolved configuration
   kilo debug lsp           LSP debugging utilities
   kilo debug rg            ripgrep debugging utilities
@@ -224,9 +224,9 @@ Commands:
   kilo debug paths         show global paths (data, config, cache, state)
   kilo debug wait          wait indefinitely (for debugging)
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug config
@@ -234,9 +234,9 @@ Options:
 ```
 show resolved configuration
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug lsp
@@ -244,14 +244,14 @@ Options:
 ```
 LSP debugging utilities
 
-Commands:
+Commandes :
   kilo debug lsp diagnostics <file>      get diagnostics for a file
   kilo debug lsp symbols <query>         search workspace symbols
   kilo debug lsp document-symbols <uri>  get symbols from a document
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug lsp diagnostics
@@ -260,11 +260,11 @@ Options:
 get diagnostics for a file
 
 Positionals:
-  file  [string]
+  --file  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug lsp symbols
@@ -273,11 +273,11 @@ Options:
 search workspace symbols
 
 Positionals:
-  query  [string]
+  --query  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug lsp document-symbols
@@ -286,11 +286,11 @@ Options:
 get symbols from a document
 
 Positionals:
-  uri  [string]
+  --uri  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug rg
@@ -298,13 +298,13 @@ Options:
 ```
 ripgrep debugging utilities
 
-Commands:
+Commandes :
   kilo debug rg files             list files using ripgrep
   kilo debug rg search <pattern>  search file contents using ripgrep
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug rg files
@@ -312,12 +312,12 @@ Options:
 ```
 list files using ripgrep
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --query    Filter files by query  [string]
-  --glob     Glob pattern to match files  [string]
-  --limit    Limit number of results  [number]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --query    Filter files by query  [chaîne de caractères]
+  --glob     Glob pattern to match files  [chaîne de caractères]
+  --limit    Limit number of results  [nombre]
 ```
 
 ### kilo debug rg search
@@ -326,13 +326,13 @@ Options:
 search file contents using ripgrep
 
 Positionals:
-  pattern  Search pattern  [string]
+  --pattern  Search pattern  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --glob     File glob patterns  [array]
-  --limit    Limit number of results  [number]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --glob     File glob patterns  [tableau]
+  --limit    Limit number of results  [nombre]
 ```
 
 ### kilo debug file
@@ -340,14 +340,14 @@ Options:
 ```
 file system debugging utilities
 
-Commands:
+Commandes :
   kilo debug file read <path>     read file contents as JSON
   kilo debug file list <path>     list files in a directory
   kilo debug file search <query>  search files by query
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug file read
@@ -356,11 +356,11 @@ Options:
 read file contents as JSON
 
 Positionals:
-  path  File path to read  [string]
+  --path  File path to read  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug file list
@@ -369,11 +369,11 @@ Options:
 list files in a directory
 
 Positionals:
-  path  File path to list  [string]
+  --path  File path to list  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug file search
@@ -382,11 +382,11 @@ Options:
 search files by query
 
 Positionals:
-  query  Search query  [string]
+  --query  Search query  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug scrap
@@ -394,9 +394,9 @@ Options:
 ```
 list all known projects
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug skill
@@ -404,9 +404,9 @@ Options:
 ```
 list all available skills
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug snapshot
@@ -414,14 +414,14 @@ Options:
 ```
 snapshot debugging utilities
 
-Commands:
+Commandes :
   kilo debug snapshot track         track current snapshot state
   kilo debug snapshot patch <hash>  show patch for a snapshot hash
   kilo debug snapshot diff <hash>   show diff for a snapshot hash
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug snapshot track
@@ -429,9 +429,9 @@ Options:
 ```
 track current snapshot state
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug snapshot patch
@@ -440,11 +440,11 @@ Options:
 show patch for a snapshot hash
 
 Positionals:
-  hash  hash  [string]
+  --hash  hash  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug snapshot diff
@@ -453,11 +453,11 @@ Options:
 show diff for a snapshot hash
 
 Positionals:
-  hash  hash  [string]
+  --hash  hash  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug startup
@@ -465,9 +465,9 @@ Options:
 ```
 print startup timing
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug agent
@@ -476,13 +476,13 @@ Options:
 show agent configuration details
 
 Positionals:
-  name  Agent name  [string]
+  --name  Agent name  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --tool     Tool id to execute  [string]
-  --params   Tool params as JSON or a JS object literal  [string]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --tool     Tool id to execute  [chaîne de caractères]
+  --params   Tool params as JSON or a JS object literal  [chaîne de caractères]
 ```
 
 ### kilo debug v2
@@ -490,9 +490,9 @@ Options:
 ```
 debug v2 catalog and built-in plugins
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug info
@@ -500,9 +500,9 @@ Options:
 ```
 show debug information
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug paths
@@ -510,9 +510,9 @@ Options:
 ```
 show global paths (data, config, cache, state)
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo debug wait
@@ -520,9 +520,9 @@ Options:
 ```
 wait indefinitely (for debugging)
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo auth
@@ -530,14 +530,14 @@ Options:
 ```
 manage AI providers and credentials
 
-Commands:
-  kilo auth list               list providers and credentials  [aliases: ls]
+Commandes :
+  kilo auth list               list providers and credentials  [alias : ls]
   kilo auth login [url]        log in to a provider
   kilo auth logout [provider]  log out from a configured provider
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo auth list
@@ -545,9 +545,9 @@ Options:
 ```
 list providers and credentials
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo auth login
@@ -556,13 +556,13 @@ Options:
 log in to a provider
 
 Positionals:
-  url  kilo auth provider  [string]
+      --url  kilo auth provider  [chaîne de caractères]
 
-Options:
-      --help      Show help  [boolean]
-      --version   Show version number  [boolean]
-  -p, --provider  provider id or name to log in to (skips provider selection)  [string]
-  -m, --method    login method label (skips method selection)  [string]
+Options :
+      --help      Affiche l'aide  [booléen]
+      --version   Affiche le numéro de version  [booléen]
+  -p, --provider  provider id or name to log in to (skips provider selection)  [chaîne de caractères]
+  -m, --method    login method label (skips method selection)  [chaîne de caractères]
 ```
 
 ### kilo auth logout
@@ -571,11 +571,11 @@ Options:
 log out from a configured provider
 
 Positionals:
-  provider  provider id or name to log out from  [string]
+  --provider  provider id or name to log out from  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo agent
@@ -583,13 +583,13 @@ Options:
 ```
 manage agents
 
-Commands:
+Commandes :
   kilo agent create  create a new agent
   kilo agent list    list all available agents
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo agent create
@@ -597,14 +597,14 @@ Options:
 ```
 create a new agent
 
-Options:
-      --help                  Show help  [boolean]
-      --version               Show version number  [boolean]
-      --path                  directory path to generate the agent file  [string]
-      --description           what the agent should do  [string]
-      --mode                  agent mode  [string] [choices: "all", "primary", "subagent"]
-      --permissions, --tools  comma-separated list of permissions to allow (default: all). Available: "bash, read, edit, glob, grep, webfetch, task, todowrite, websearch, lsp, skill"  [string]
-  -m, --model                 model to use in the format of provider/model  [string]
+Options :
+      --help                  Affiche l'aide  [booléen]
+      --version               Affiche le numéro de version  [booléen]
+      --path                  directory path to generate the agent file  [chaîne de caractères]
+      --description           what the agent should do  [chaîne de caractères]
+      --mode                  agent mode  [chaîne de caractères] [choix : "all", "primary", "subagent"]
+      --permissions, --tools  comma-separated list of permissions to allow (default: all). Available: "bash, read, edit, glob, grep, webfetch, task, todowrite, websearch, lsp, skill"  [chaîne de caractères]
+  -m, --model                 model to use in the format of provider/model  [chaîne de caractères]
 ```
 
 ### kilo agent list
@@ -612,9 +612,9 @@ Options:
 ```
 list all available agents
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo upgrade
@@ -623,12 +623,12 @@ Options:
 upgrade kilo to the latest or a specific version
 
 Positionals:
-  target  version to upgrade to, for ex '0.1.48' or 'v0.1.48'  [string]
+      --target  version to upgrade to, for ex '0.1.48' or 'v0.1.48'  [chaîne de caractères]
 
-Options:
-      --help     Show help  [boolean]
-      --version  Show version number  [boolean]
-  -m, --method   installation method to use  [string] [choices: "curl", "npm", "yarn", "pnpm", "bun", "brew", "choco", "scoop"]
+Options :
+      --help     Affiche l'aide  [booléen]
+      --version  Affiche le numéro de version  [booléen]
+  -m, --method   installation method to use  [chaîne de caractères] [choix : "curl", "npm", "yarn", "pnpm", "bun", "brew", "choco", "scoop"]
 ```
 
 ## kilo uninstall
@@ -636,13 +636,13 @@ Options:
 ```
 uninstall kilo and remove all related files
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-  -c, --keep-config  keep configuration files  [boolean] [default: false]
-  -d, --keep-data    keep session data and snapshots  [boolean] [default: false]
-      --dry-run      show what would be removed without removing  [boolean] [default: false]
-  -f, --force        skip confirmation prompts  [boolean] [default: false]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+  -c, --keep-config  keep configuration files  [booléen] [défaut : false]
+  -d, --keep-data    keep session data and snapshots  [booléen] [défaut : false]
+      --dry-run      show what would be removed without removing  [booléen] [défaut : false]
+  -f, --force        skip confirmation prompts  [booléen] [défaut : false]
 ```
 
 ## kilo serve
@@ -650,14 +650,14 @@ Options:
 ```
 starts a headless kilo server
 
-Options:
-  --help         Show help  [boolean]
-  --version      Show version number  [boolean]
-  --port         port to listen on  [number] [default: 0]
-  --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-  --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-  --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-  --cors         additional domains to allow for CORS  [array] [default: []]
+Options :
+  --help         Affiche l'aide  [booléen]
+  --version      Affiche le numéro de version  [booléen]
+  --port         port to listen on  [nombre] [défaut : 0]
+  --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+  --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+  --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+  --cors         additional domains to allow for CORS  [tableau] [défaut : []]
 ```
 
 ## kilo models
@@ -666,13 +666,13 @@ Options:
 list all available models
 
 Positionals:
-  provider  provider ID to filter models by  [string]
+  --provider  provider ID to filter models by  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --verbose  use more verbose model output (includes metadata like costs)  [boolean]
-  --refresh  refresh the models cache from models.dev  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --verbose  use more verbose model output (includes metadata like costs)  [booléen]
+  --refresh  refresh the models cache from models.dev  [booléen]
 ```
 
 ## kilo roll-call
@@ -681,17 +681,17 @@ Options:
 batch-test text models matching a filter for connectivity and latency
 
 Positionals:
-  filter  regex to filter models by provider/modelID (required)  [string]
+  --filter  regex to filter models by provider/modelID (required)  [chaîne de caractères]
 
-Options:
-  --help      Show help  [boolean]
-  --version   Show version number  [boolean]
-  --prompt    Prompt to send to each model  [string] [default: "Hello"]
-  --timeout   Timeout for each model call in milliseconds  [number] [default: 25000]
-  --parallel  Number of parallel model calls  [number] [default: 5]
-  --verbose   Show verbose output  [boolean] [default: false]
-  --quiet     Suppress progress and decoration  [boolean] [default: false]
-  --output    Output format (table, json, or md)  [string] [choices: "table", "json", "md"] [default: "table"]
+Options :
+  --help      Affiche l'aide  [booléen]
+  --version   Affiche le numéro de version  [booléen]
+  --prompt    Prompt to send to each model  [chaîne de caractères] [défaut : "Hello"]
+  --timeout   Timeout for each model call in milliseconds  [nombre] [défaut : 25000]
+  --parallel  Number of parallel model calls  [nombre] [défaut : 5]
+  --verbose   Show verbose output  [booléen] [défaut : false]
+  --quiet     Suppress progress and decoration  [booléen] [défaut : false]
+  --output    Output format (table, json, or md)  [chaîne de caractères] [choix : "table", "json", "md"] [défaut : "table"]
 ```
 
 ## kilo profile
@@ -699,10 +699,98 @@ Options:
 ```
 show Kilo account profile
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --json     output profile as JSON  [boolean] [default: false]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --json     output profile as JSON  [booléen] [défaut : false]
+```
+
+## kilo auto
+
+```
+custom auto routers: register client models and run client evals
+
+Commandes :
+  kilo auto router         manage custom auto router client entries
+  kilo auto eval <router>  run the missing client evals for a custom auto router locally in Docker
+
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+```
+
+### kilo auto router
+
+```
+manage custom auto router client entries
+
+Commandes :
+  kilo auto router list                     list custom auto routers, their entries, and per-entry eval status
+  kilo auto router add <router> <model>     register a client model as a custom auto router entry
+  kilo auto router remove <router> <model>  remove a client model entry from a custom auto router
+
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+```
+
+### kilo auto router list
+
+```
+list custom auto routers, their entries, and per-entry eval status
+
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --json     print the raw router list as JSON  [booléen] [défaut : false]
+```
+
+### kilo auto router add
+
+```
+register a client model as a custom auto router entry
+
+Positionals:
+  --router  router id or slug  [chaîne de caractères]
+  --model   <provider>/<model> resolved by this CLI  [chaîne de caractères]
+
+Options :
+  --help         Affiche l'aide  [booléen]
+  --version      Affiche le numéro de version  [booléen]
+  --measured-as  reuse the platform benchmark of this model  [chaîne de caractères]
+  --link         suggest a platform benchmark link (--no-link skips it; a stored link stays until cleared in the web editor)  [booléen] [défaut : true]
+  --yes          accept a suggested platform benchmark link  [booléen] [défaut : false]
+```
+
+### kilo auto router remove
+
+```
+remove a client model entry from a custom auto router
+
+Positionals:
+  --router  router id or slug  [chaîne de caractères]
+  --model   <provider>/<model>  [chaîne de caractères]
+
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+```
+
+### kilo auto eval
+
+```
+run the missing client evals for a custom auto router locally in Docker
+
+Positionals:
+  --router  router id or slug  [chaîne de caractères]
+
+Options :
+  --help          Affiche l'aide  [booléen]
+  --version       Affiche le numéro de version  [booléen]
+  --yes           skip the plan confirmation  [booléen] [défaut : false]
+  --concurrency   number of cases to run in parallel  [nombre] [défaut : 1]
+  --cli-version   published @kilocode/cli version to install in the eval image (default: this CLI's version)  [chaîne de caractères]
+  --debug-config  print the Docker command and the generated container config, then exit  [booléen] [défaut : false]
 ```
 
 ## kilo stats
@@ -710,13 +798,13 @@ Options:
 ```
 show token usage and cost statistics
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --days     show stats for the last N days (default: all time)  [number]
-  --tools    number of tools to show (default: all)  [number]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --days     show stats for the last N days (default: all time)  [nombre]
+  --tools    number of tools to show (default: all)  [nombre]
   --models   show model statistics (default: hidden). Pass a number to show top N, otherwise shows all
-  --project  filter by project (default: all projects, empty string: current project)  [string]
+  --project  filter by project (default: all projects, empty string: current project)  [chaîne de caractères]
 ```
 
 ## kilo export
@@ -725,12 +813,12 @@ Options:
 export session data as JSON
 
 Positionals:
-  sessionID  session id to export  [string]
+  --sessionID  session id to export  [chaîne de caractères]
 
-Options:
-  --help      Show help  [boolean]
-  --version   Show version number  [boolean]
-  --sanitize  redact sensitive transcript and file data  [boolean]
+Options :
+  --help      Affiche l'aide  [booléen]
+  --version   Affiche le numéro de version  [booléen]
+  --sanitize  redact sensitive transcript and file data  [booléen]
 ```
 
 ## kilo import
@@ -739,11 +827,11 @@ Options:
 import session data from JSON file or URL
 
 Positionals:
-  file  path to JSON file or share URL  [string]
+  --file  path to JSON file or share URL  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo github
@@ -751,13 +839,13 @@ Options:
 ```
 manage GitHub agent
 
-Commands:
+Commandes :
   kilo github install  install the GitHub agent
   kilo github run      run the GitHub agent
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo github install
@@ -765,9 +853,9 @@ Options:
 ```
 install the GitHub agent
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo github run
@@ -775,11 +863,11 @@ Options:
 ```
 run the GitHub agent
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --event    GitHub mock event to run the agent for  [string]
-  --token    GitHub personal access token (github_pat_********)  [string]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --event    GitHub mock event to run the agent for  [chaîne de caractères]
+  --token    GitHub personal access token (github_pat_********)  [chaîne de caractères]
 ```
 
 ## kilo pr
@@ -787,15 +875,15 @@ Options:
 ```
 manage pull requests
 
-Commands:
+Commandes :
   kilo pr checkout <number>  fetch and checkout a GitHub PR branch, then run kilo
   kilo pr link <url>         link a session to a pull request
   kilo pr unlink             clear a session's linked pull request
   kilo pr status             show a session's linked pull request
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo pr checkout
@@ -804,11 +892,11 @@ Options:
 fetch and checkout a GitHub PR branch, then run kilo
 
 Positionals:
-  number  PR number to checkout  [number]
+  --number  PR number to checkout  [nombre]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo pr link
@@ -817,12 +905,12 @@ Options:
 link a session to a pull request
 
 Positionals:
-  url  PR URL to link  [string]
+      --url  PR URL to link  [chaîne de caractères]
 
-Options:
-      --help     Show help  [boolean]
-      --version  Show version number  [boolean]
-  -s, --session  session id to apply the PR link to  [string]
+Options :
+      --help     Affiche l'aide  [booléen]
+      --version  Affiche le numéro de version  [booléen]
+  -s, --session  session id to apply the PR link to  [chaîne de caractères]
 ```
 
 ### kilo pr unlink
@@ -830,10 +918,10 @@ Options:
 ```
 clear a session's linked pull request
 
-Options:
-      --help     Show help  [boolean]
-      --version  Show version number  [boolean]
-  -s, --session  session id to apply the PR link to  [string]
+Options :
+      --help     Affiche l'aide  [booléen]
+      --version  Affiche le numéro de version  [booléen]
+  -s, --session  session id to apply the PR link to  [chaîne de caractères]
 ```
 
 ### kilo pr status
@@ -841,10 +929,10 @@ Options:
 ```
 show a session's linked pull request
 
-Options:
-      --help     Show help  [boolean]
-      --version  Show version number  [boolean]
-  -s, --session  session id to apply the PR link to  [string]
+Options :
+      --help     Affiche l'aide  [booléen]
+      --version  Affiche le numéro de version  [booléen]
+  -s, --session  session id to apply the PR link to  [chaîne de caractères]
 ```
 
 ## kilo session
@@ -852,13 +940,13 @@ Options:
 ```
 manage sessions
 
-Commands:
+Commandes :
   kilo session list                list sessions
   kilo session delete <sessionID>  delete a session
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo session list
@@ -866,13 +954,13 @@ Options:
 ```
 list sessions
 
-Options:
-      --help       Show help  [boolean]
-      --version    Show version number  [boolean]
-  -n, --max-count  limit to N most recent sessions  [number]
-      --format     output format  [string] [choices: "table", "json"] [default: "table"]
-  -a, --all        list sessions from all projects  [boolean] [default: false]
-  -s, --search     filter sessions by title  [string]
+Options :
+      --help       Affiche l'aide  [booléen]
+      --version    Affiche le numéro de version  [booléen]
+  -n, --max-count  limit to N most recent sessions  [nombre]
+      --format     output format  [chaîne de caractères] [choix : "table", "json"] [défaut : "table"]
+  -a, --all        list sessions from all projects  [booléen] [défaut : false]
+  -s, --search     filter sessions by title  [chaîne de caractères]
 ```
 
 ### kilo session delete
@@ -881,11 +969,11 @@ Options:
 delete a session
 
 Positionals:
-  sessionID  session ID to delete  [string]
+  --sessionID  session ID to delete  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo remote
@@ -893,9 +981,9 @@ Options:
 ```
 enable remote connection for real-time session relay
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo daemon
@@ -903,23 +991,23 @@ Options:
 ```
 manage the local kilo daemon
 
-Commands:
-  kilo daemon          start the local kilo daemon  [default]
+Commandes :
+  kilo daemon          start the local kilo daemon  [défaut]
   kilo daemon start    start the local kilo daemon
   kilo daemon status   show local kilo daemon status
   kilo daemon stop     stop the local kilo daemon
   kilo daemon restart  restart the local kilo daemon
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-      --port         port to listen on  [number] [default: 0]
-      --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-      --cors         additional domains to allow for CORS  [array] [default: []]
-      --json         print daemon details as JSON  [boolean]
-  -f, --foreground   keep the command active until interrupted  [boolean]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+      --port         port to listen on  [nombre] [défaut : 0]
+      --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+      --cors         additional domains to allow for CORS  [tableau] [défaut : []]
+      --json         print daemon details as JSON  [booléen]
+  -f, --foreground   keep the command active until interrupted  [booléen]
 ```
 
 ### kilo daemon start
@@ -927,16 +1015,16 @@ Options:
 ```
 start the local kilo daemon
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-      --port         port to listen on  [number] [default: 0]
-      --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-      --cors         additional domains to allow for CORS  [array] [default: []]
-      --json         print daemon details as JSON  [boolean]
-  -f, --foreground   keep the command active until interrupted  [boolean]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+      --port         port to listen on  [nombre] [défaut : 0]
+      --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+      --cors         additional domains to allow for CORS  [tableau] [défaut : []]
+      --json         print daemon details as JSON  [booléen]
+  -f, --foreground   keep the command active until interrupted  [booléen]
 ```
 
 ### kilo daemon status
@@ -944,10 +1032,10 @@ Options:
 ```
 show local kilo daemon status
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --json     print daemon details as JSON  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --json     print daemon details as JSON  [booléen]
 ```
 
 ### kilo daemon stop
@@ -955,10 +1043,10 @@ Options:
 ```
 stop the local kilo daemon
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --json     print daemon details as JSON  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --json     print daemon details as JSON  [booléen]
 ```
 
 ### kilo daemon restart
@@ -966,16 +1054,16 @@ Options:
 ```
 restart the local kilo daemon
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-      --port         port to listen on  [number] [default: 0]
-      --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-      --cors         additional domains to allow for CORS  [array] [default: []]
-      --json         print daemon details as JSON  [boolean]
-  -f, --foreground   keep the command active until interrupted  [boolean]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+      --port         port to listen on  [nombre] [défaut : 0]
+      --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+      --cors         additional domains to allow for CORS  [tableau] [défaut : []]
+      --json         print daemon details as JSON  [booléen]
+  -f, --foreground   keep the command active until interrupted  [booléen]
 ```
 
 ## kilo console
@@ -983,19 +1071,19 @@ Options:
 ```
 open or stop the local Kilo Console (deprecated)
 
-Commands:
-  kilo console       open the local Kilo Console (deprecated)  [default]
+Commandes :
+  kilo console       open the local Kilo Console (deprecated)  [défaut]
   kilo console stop  stop the local kilo daemon
 
-Options:
-      --help         Show help  [boolean]
-      --version      Show version number  [boolean]
-      --port         port to listen on  [number] [default: 0]
-      --hostname     hostname to listen on  [string] [default: "127.0.0.1"]
-      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [boolean] [default: false]
-      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [string] [default: "kilo.local"]
-      --cors         additional domains to allow for CORS  [array] [default: []]
-  -f, --foreground   keep the command active until interrupted  [boolean]
+Options :
+      --help         Affiche l'aide  [booléen]
+      --version      Affiche le numéro de version  [booléen]
+      --port         port to listen on  [nombre] [défaut : 0]
+      --hostname     hostname to listen on  [chaîne de caractères] [défaut : "127.0.0.1"]
+      --mdns         enable mDNS service discovery (defaults hostname to 0.0.0.0)  [booléen] [défaut : false]
+      --mdns-domain  custom domain name for mDNS service (default: kilo.local)  [chaîne de caractères] [défaut : "kilo.local"]
+      --cors         additional domains to allow for CORS  [tableau] [défaut : []]
+  -f, --foreground   keep the command active until interrupted  [booléen]
 ```
 
 ### kilo console stop
@@ -1003,10 +1091,10 @@ Options:
 ```
 stop the local kilo daemon
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --json     print daemon details as JSON  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --json     print daemon details as JSON  [booléen]
 ```
 
 ## kilo cloud
@@ -1014,15 +1102,15 @@ Options:
 ```
 run Cloud Agent tasks
 
-Commands:
+Commandes :
   kilo cloud start   start a Cloud Agent task
   kilo cloud send    send a follow-up prompt to a Cloud Agent task
   kilo cloud status  show Cloud Agent task status
   kilo cloud result  show a Cloud Agent task result
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo cloud start
@@ -1030,18 +1118,18 @@ Options:
 ```
 start a Cloud Agent task
 
-Options:
-  --help          Show help  [boolean]
-  --version       Show version number  [boolean]
-  --prompt        prompt for the Cloud Agent  [string]
-  --prompt-stdin  read the prompt from standard input  [boolean] [default: false]
-  --repo          repository shorthand or URL  [string]
-  --repo-type     repository provider type  [string] [choices: "github", "gitlab", "git"]
-  --branch        repository branch  [string]
-  --model         Cloud Agent model  [string]
-  --mode          Cloud Agent mode  [string]
-  --org-id        Kilo organization ID  [string]
-  --stream        connect to the WebSocket stream and print events as JSONL  [boolean]
+Options :
+  --help          Affiche l'aide  [booléen]
+  --version       Affiche le numéro de version  [booléen]
+  --prompt        prompt for the Cloud Agent  [chaîne de caractères]
+  --prompt-stdin  read the prompt from standard input  [booléen] [défaut : false]
+  --repo          repository shorthand or URL  [chaîne de caractères]
+  --repo-type     repository provider type  [chaîne de caractères] [choix : "github", "gitlab", "git"]
+  --branch        repository branch  [chaîne de caractères]
+  --model         Cloud Agent model  [chaîne de caractères]
+  --mode          Cloud Agent mode  [chaîne de caractères]
+  --org-id        Kilo organization ID  [chaîne de caractères]
+  --stream        connect to the WebSocket stream and print events as JSONL  [booléen]
 ```
 
 ### kilo cloud send
@@ -1049,12 +1137,12 @@ Options:
 ```
 send a follow-up prompt to a Cloud Agent task
 
-Options:
-  --help          Show help  [boolean]
-  --version       Show version number  [boolean]
-  --prompt        prompt for the Cloud Agent  [string]
-  --prompt-stdin  read the prompt from standard input  [boolean] [default: false]
-  --session-id    Cloud Agent session ID  [string] [required]
+Options :
+  --help          Affiche l'aide  [booléen]
+  --version       Affiche le numéro de version  [booléen]
+  --prompt        prompt for the Cloud Agent  [chaîne de caractères]
+  --prompt-stdin  read the prompt from standard input  [booléen] [défaut : false]
+  --session-id    Cloud Agent session ID  [chaîne de caractères] [requis]
 ```
 
 ### kilo cloud status
@@ -1062,11 +1150,11 @@ Options:
 ```
 show Cloud Agent task status
 
-Options:
-  --help        Show help  [boolean]
-  --version     Show version number  [boolean]
-  --session-id  Cloud Agent session ID  [string] [required]
-  --message-id  Cloud Agent message ID  [string] [required]
+Options :
+  --help        Affiche l'aide  [booléen]
+  --version     Affiche le numéro de version  [booléen]
+  --session-id  Cloud Agent session ID  [chaîne de caractères] [requis]
+  --message-id  Cloud Agent message ID  [chaîne de caractères] [requis]
 ```
 
 ### kilo cloud result
@@ -1074,11 +1162,11 @@ Options:
 ```
 show a Cloud Agent task result
 
-Options:
-  --help        Show help  [boolean]
-  --version     Show version number  [boolean]
-  --session-id  Cloud Agent session ID  [string] [required]
-  --message-id  Cloud Agent message ID  [string] [required]
+Options :
+  --help        Affiche l'aide  [booléen]
+  --version     Affiche le numéro de version  [booléen]
+  --session-id  Cloud Agent session ID  [chaîne de caractères] [requis]
+  --message-id  Cloud Agent message ID  [chaîne de caractères] [requis]
 ```
 
 ## kilo db
@@ -1086,17 +1174,17 @@ Options:
 ```
 database tools
 
-Commands:
-  kilo db [query]     open an interactive sqlite3 shell or run a query  [default]
+Commandes :
+  kilo db [query]     open an interactive sqlite3 shell or run a query  [défaut]
   kilo db path        print the database path
 
-Positionals:
-  query  SQL query to execute  [string]
+Arguments positionnels :
+  query  SQL query to execute  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --format   Output format  [string] [choices: "json", "tsv"] [default: "tsv"]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --format   Output format  [chaîne de caractères] [choix : "json", "tsv"] [défaut : "tsv"]
 ```
 
 ### kilo db path
@@ -1104,9 +1192,9 @@ Options:
 ```
 print the database path
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo config
@@ -1114,12 +1202,12 @@ Options:
 ```
 configuration tools
 
-Commands:
+Commandes :
   kilo config check  check configuration for warnings and errors
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ### kilo config check
@@ -1127,9 +1215,9 @@ Options:
 ```
 check configuration for warnings and errors
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```
 
 ## kilo plugin
@@ -1138,13 +1226,13 @@ Options:
 install plugin and update config
 
 Positionals:
-  module  npm module name  [string]
+      --module  npm module name  [chaîne de caractères]
 
-Options:
-      --help     Show help  [boolean]
-      --version  Show version number  [boolean]
-  -g, --global   install in global config  [boolean] [default: false]
-  -f, --force    replace existing plugin version  [boolean] [default: false]
+Options :
+      --help     Affiche l'aide  [booléen]
+      --version  Affiche le numéro de version  [booléen]
+  -g, --global   install in global config  [booléen] [défaut : false]
+  -f, --force    replace existing plugin version  [booléen] [défaut : false]
 ```
 
 ## kilo help
@@ -1153,13 +1241,13 @@ Options:
 show full CLI reference
 
 Positionals:
-  command  command to show help for  [string]
+  --command  command to show help for  [chaîne de caractères]
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
-  --all      show help for all commands  [boolean] [default: false]
-  --format   output format  [string] [choices: "md", "text"] [default: "md"]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
+  --all      show help for all commands  [booléen] [défaut : false]
+  --format   output format  [chaîne de caractères] [choix : "md", "text"] [défaut : "md"]
 ```
 
 ## kilo completion
@@ -1167,7 +1255,7 @@ Options:
 ```
 generate shell completion script
 
-Options:
-  --help     Show help  [boolean]
-  --version  Show version number  [boolean]
+Options :
+  --help     Affiche l'aide  [booléen]
+  --version  Affiche le numéro de version  [booléen]
 ```

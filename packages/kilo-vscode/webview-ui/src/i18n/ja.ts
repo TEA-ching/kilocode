@@ -333,6 +333,7 @@ export const dict = {
   "ui.permission.toolLabel.todoRead": "Todo読み込み",
   "ui.permission.toolLabel.todoWrite": "Todo書き込み",
   "ui.permission.toolLabel.codeSearch": "コード検索",
+  "ui.permission.toolLabel.browserOpen": "統合ブラウザー",
   "ui.permission.copyCommand": "コピー",
   "ui.approval.auto": "自動承認されました",
   "ui.approval.manual": "あなたが承認しました",
@@ -607,6 +608,7 @@ export const dict = {
   "settings.permissions.tool.webfetch.description": "URLからコンテンツを取得",
   "settings.permissions.tool.websearch.description": "ウェブを検索",
   "settings.permissions.tool.codesearch.description": "ウェブ上のコードを検索",
+  "settings.permissions.tool.browser_open.description": "統合ブラウザーでページを開く",
   "settings.permissions.tool.external_directory.description": "プロジェクトディレクトリ外のファイルへのアクセス",
   "settings.permissions.tool.doom_loop.description": "同一入力による繰り返しのツール呼び出しを検出",
 
@@ -764,6 +766,11 @@ export const dict = {
 
   "session.messages.welcome":
     "Kilo CodeはAIコーディングアシスタントです。機能の構築、バグの修正、コードベースの説明を依頼できます。",
+  "session.workspaceScope.description":
+    "Kilo チャットは、このワークスペースの最初のフォルダー「{{folder}}」のみを使用します。",
+  "session.workspaceScope.alternatives":
+    "別のフォルダーで作業するには、そのフォルダーを別のウィンドウで開くか、Agent Manager にプロジェクトとして追加してください。",
+  "session.workspaceScope.dismiss": "ワークスペースの範囲に関するヒントを閉じる",
   "session.messages.scrollToBottom": "下にスクロール",
   "session.messages.initializing": "初期化中...",
   "session.messages.taskStarting": "開始中...",
@@ -969,6 +976,9 @@ export const dict = {
   "settings.experimental.conversationPromptHistory.title": "会話ごとのプロンプト履歴",
   "settings.experimental.conversationPromptHistory.description":
     "プロンプト履歴 (ArrowUp/ArrowDown) をすべての会話で共有せず、会話ごとに分けて保持します。",
+  "settings.experimental.agentManagerSplash.title": "Agent Manager スプラッシュ画面",
+  "settings.experimental.agentManagerSplash.description":
+    "ワークフローの例を含む新しい Agent Manager の紹介画面を試せます。変更はすぐに適用されます。",
   "settings.experimental.claudeMigration.title": "Claude Code 移行",
   "settings.experimental.claudeMigration.description":
     "サポートされるグローバル CLAUDE.md 命令、簡単なスキル、無効化された MCP 定義を一度だけインポートします。元の Claude ファイルは変更されません。有効化後にバックエンドを再起動してください。",
@@ -1172,6 +1182,8 @@ export const dict = {
   "settings.autoApprove.tool.todoreadwrite": "タスクリストの管理。内部タスクリストの読み取りと更新を許可します。",
   "settings.autoApprove.tool.webfetch": "URLをフェッチ。特定のURLからコンテンツを取得することを許可します。",
   "settings.autoApprove.tool.websearch": "ウェブを検索。外部のWeb検索の実行を許可します。",
+  "settings.autoApprove.tool.browser_open":
+    "統合ブラウザーでページを開きます。これはアプリ内プレビューであり、Playwright のブラウザー自動化ではありません。",
   "settings.autoApprove.tool.external_directory":
     "ワークスペース外のファイルにアクセス。現在のプロジェクトディレクトリ外のファイルにアクセスしたときにトリガーされます。",
   "settings.autoApprove.tool.doom_loop":
