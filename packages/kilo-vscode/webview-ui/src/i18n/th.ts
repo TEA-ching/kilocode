@@ -330,6 +330,7 @@ export const dict = {
   "ui.permission.toolLabel.todoRead": "อ่านรายการงาน",
   "ui.permission.toolLabel.todoWrite": "เขียนรายการงาน",
   "ui.permission.toolLabel.codeSearch": "ค้นหาโค้ด",
+  "ui.permission.toolLabel.browserOpen": "เบราว์เซอร์ในตัว",
   "ui.permission.copyCommand": "คัดลอก",
   "ui.approval.auto": "อนุมัติอัตโนมัติ",
   "ui.approval.manual": "คุณเป็นผู้อนุมัติ",
@@ -604,6 +605,7 @@ export const dict = {
   "settings.permissions.tool.webfetch.description": "ดึงเนื้อหาจาก URL",
   "settings.permissions.tool.websearch.description": "ค้นหาบนเว็บ",
   "settings.permissions.tool.codesearch.description": "ค้นหาโค้ดบนเว็บ",
+  "settings.permissions.tool.browser_open.description": "เปิดหน้าในเบราว์เซอร์ในตัว",
   "settings.permissions.tool.external_directory.description": "เข้าถึงไฟล์นอกไดเรกทอรีโปรเจกต์",
   "settings.permissions.tool.doom_loop.description": "ตรวจจับการเรียกเครื่องมือซ้ำด้วยข้อมูลนำเข้าเหมือนกัน",
 
@@ -759,6 +761,10 @@ export const dict = {
   "settings.aboutKiloCode.title": "เกี่ยวกับ Kilo Code",
 
   "session.messages.welcome": "Kilo Code เป็นผู้ช่วยเขียนโค้ด AI ขอให้สร้างฟีเจอร์ แก้ไขบัก หรืออธิบายโค้ดเบสของคุณ",
+  "session.workspaceScope.description": "แชต Kilo ใช้เฉพาะ “{{folder}}” ซึ่งเป็นโฟลเดอร์แรกในพื้นที่ทำงานนี้",
+  "session.workspaceScope.alternatives":
+    "หากต้องการทำงานกับโฟลเดอร์อื่น ให้เปิดโฟลเดอร์นั้นในหน้าต่างแยกต่างหาก หรือเพิ่มเป็นโปรเจกต์ใน Agent Manager",
+  "session.workspaceScope.dismiss": "ปิดคำแนะนำเกี่ยวกับขอบเขตพื้นที่ทำงาน",
   "session.messages.scrollToBottom": "เลื่อนไปด้านล่าง",
   "session.messages.initializing": "กำลังเริ่มต้น...",
   "session.messages.taskStarting": "กำลังเริ่มทำงาน...",
@@ -960,6 +966,9 @@ export const dict = {
   "settings.experimental.conversationPromptHistory.title": "ประวัติพรอมต์แยกตามการสนทนา",
   "settings.experimental.conversationPromptHistory.description":
     "แยกประวัติพรอมต์ (ArrowUp/ArrowDown) ตามแต่ละการสนทนา แทนการใช้ประวัติเดียวร่วมกันในทุกการสนทนา",
+  "settings.experimental.agentManagerSplash.title": "หน้าต้อนรับ Agent Manager",
+  "settings.experimental.agentManagerSplash.description":
+    "ลองหน้าบทนำใหม่ของ Agent Manager พร้อมตัวอย่างเวิร์กโฟลว์ มีผลทันที",
   "settings.experimental.claudeMigration.title": "การย้าย Claude Code",
   "settings.experimental.claudeMigration.description":
     "นำเข้าคำสั่ง CLAUDE.md ระดับโลกที่รองรับ ทักษะอย่างง่าย และคำจำกัดความ MCP ที่ปิดใช้งานเพียงครั้งเดียว ไฟล์ Claude ต้นฉบับจะไม่ถูกแก้ไข ให้เริ่มแบ็กเอนด์ใหม่หลังเปิดใช้งาน",
@@ -1157,6 +1166,8 @@ export const dict = {
   "settings.autoApprove.tool.todoreadwrite": "จัดการรายการงาน อนุญาตให้อ่านและอัปเดตรายการงานภายใน",
   "settings.autoApprove.tool.webfetch": "ดึงข้อมูลจาก URL อนุญาตให้ดึงเนื้อหาจาก URL ที่ระบุ",
   "settings.autoApprove.tool.websearch": "ค้นหาบนเว็บ อนุญาตให้ทำการค้นหาเว็บภายนอก",
+  "settings.autoApprove.tool.browser_open":
+    "เปิดหน้าในเบราว์เซอร์ในตัว นี่คือการแสดงตัวอย่างในแอป ไม่ใช่ระบบอัตโนมัติของเบราว์เซอร์ Playwright",
   "settings.autoApprove.tool.external_directory":
     "เข้าถึงไฟล์นอกพื้นที่ทำงาน (Workspace) ถูกเรียกเมื่อเข้าถึงไฟล์ภายนอกไดเรกทอรีโปรเจ็กต์ปัจจุบัน",
   "settings.autoApprove.tool.doom_loop":
