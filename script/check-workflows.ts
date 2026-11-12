@@ -45,6 +45,7 @@ const active = new Set([
   "docs-build.yml",
   "docs-check-links.yml",
   "docs-sync.yml",
+  "fork-sync.yml",
   "generate.yml",
   "keypool-live-preview.yml",
   "kilo-auto-close.yml",
