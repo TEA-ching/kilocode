@@ -4043,7 +4043,11 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
     requestId?: string,
   ): Promise<void> {
     if (!this.client || this.connectionState !== "connected") {
-      this.postMessage({ type: "configUpdateFailed", message: "Not connected to CLI backend", saveRequestId: requestId })
+      this.postMessage({
+        type: "configUpdateFailed",
+        message: "Not connected to CLI backend",
+        saveRequestId: requestId,
+      })
       return
     }
 

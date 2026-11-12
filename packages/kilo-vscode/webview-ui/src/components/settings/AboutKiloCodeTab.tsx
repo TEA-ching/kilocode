@@ -65,7 +65,12 @@ const AboutKiloCodeTab: Component<AboutKiloCodeTabProps> = (props) => {
         setUpdateError(msg.error)
         setCheckState("error")
       } else if (msg.updateAvailable) {
-        setUpdateInfo({ downloadUrl: msg.downloadUrl, assetName: msg.assetName, tagName: msg.tagName, publishedAt: msg.publishedAt })
+        setUpdateInfo({
+          downloadUrl: msg.downloadUrl,
+          assetName: msg.assetName,
+          tagName: msg.tagName,
+          publishedAt: msg.publishedAt,
+        })
         setCheckState("update_available")
       } else {
         setUpdateInfo({ tagName: msg.tagName, publishedAt: msg.publishedAt })
