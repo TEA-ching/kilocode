@@ -25,7 +25,7 @@ chrono = "0.4.39"
 bytes = "1.8.0"
 flate2 = "1.0.35"
 tar = "0.4.43"
-zip = "2.2.2"
+zip = "9.6.1"
 
 [dev-dependencies]
 mockito = "1.7.2"

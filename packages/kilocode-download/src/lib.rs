@@ -238,10 +238,13 @@ pub fn extract_archive(
             let mut entry = archive
                 .by_index(i)
                 .map_err(|e| KilocodeDownloadError::ArchiveError(e.to_string()))?;
-            let is_match = Path::new(entry.name())
-                .file_name()
-                .and_then(|n| n.to_str())
-                == Some(source);
+            // zip >= 9: name() is fallible (invalid/unsafe entry names are errors).
+            let is_match = entry.name().is_ok_and(|name| {
+                Path::new(name.as_ref())
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    == Some(source)
+            });
             if is_match {
                 let mut outfile = fs::File::create(dest_file)?;
                 io::copy(&mut entry, &mut outfile)?;
