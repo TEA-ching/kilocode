@@ -50,7 +50,20 @@ async fn main() -> Result<(), KilocodeDownloadError> {
 
     debug!("Parsed arguments: {:?}", args);
 
-    let octocrab = Octocrab::builder().build()?;
+    // Authenticated requests get 5000 calls/h instead of 60/h per IP, which
+    // avoids rate-limit failures on shared runners (GitHub Actions exposes
+    // GITHUB_TOKEN; the gh CLI convention is GH_TOKEN).
+    let token = ["GITHUB_TOKEN", "GH_TOKEN"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok().filter(|v| !v.trim().is_empty()));
+    let builder = match token {
+        Some(t) => {
+            debug!("Using GitHub token from environment");
+            Octocrab::builder().personal_token(t)
+        }
+        None => Octocrab::builder(),
+    };
+    let octocrab = builder.build()?;
     main_logic(&args, octocrab).await
 }
 
